@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from dashboard.server.discovery import active_run_id, discover_runs
+from dashboard.server.discovery import active_run_id, discover_projects, discover_runs
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -45,3 +45,24 @@ def test_discover_runs_in_tasks_projects(tmp_path: Path):
     assert "tasks/agentic-skill-demo/autoresearch-results.tsv" in run_ids
     assert "tasks/agentic-skill-demo/fix/260521-auth/fix-results.tsv" in run_ids
     assert {r.project_id for r in runs} == {"tasks/agentic-skill-demo"}
+
+
+def test_discover_projects_includes_tasks_without_runs(tmp_path: Path):
+    task_with_runs = tmp_path / "tasks" / "agentic-skill-demo"
+    task_with_runs.mkdir(parents=True)
+    (task_with_runs / "autoresearch-results.tsv").write_text(
+        (FIXTURES / "autoresearch-results.tsv").read_text()
+    )
+    task_empty = tmp_path / "tasks" / "gemma4-skill-optimization"
+    task_empty.mkdir(parents=True)
+
+    runs = discover_runs(tmp_path)
+    projects = discover_projects(tmp_path, runs)
+    project_ids = {p.project_id for p in projects}
+
+    assert project_ids == {".", "tasks/agentic-skill-demo", "tasks/gemma4-skill-optimization"}
+    empty = next(p for p in projects if p.project_id == "tasks/gemma4-skill-optimization")
+    assert empty.run_count == 0
+    assert empty.is_task is True
+    active = next(p for p in projects if p.project_id == "tasks/agentic-skill-demo")
+    assert active.run_count == 1
