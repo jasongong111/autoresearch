@@ -8,10 +8,10 @@ interface Props {
 }
 
 function levelClass(level: string): string {
-  if (level === "success") return "trace-level success";
-  if (level === "failure") return "trace-level failure";
-  if (level === "warning") return "trace-level warning";
-  return "trace-level info";
+  if (level === "success") return "success";
+  if (level === "failure") return "failure";
+  if (level === "warning") return "warning";
+  return "info";
 }
 
 function formatTs(ts: string): string {
@@ -84,6 +84,7 @@ export default function AgentTrace({ events, artifacts, command }: Props) {
             <span className="trace-toolbar-label">Live trace</span>
             {indexOptions.length > 0 && (
               <select
+                className="select"
                 value={filterIteration === "all" ? "all" : String(filterIteration)}
                 onChange={(e) =>
                   setFilterIteration(e.target.value === "all" ? "all" : Number(e.target.value))
@@ -123,6 +124,7 @@ export default function AgentTrace({ events, artifacts, command }: Props) {
           <div className="trace-toolbar">
             <span className="trace-toolbar-label">Trace documents</span>
             <select
+              className="select"
               value={activeArtifact?.name ?? ""}
               onChange={(e) => setSelectedArtifact(e.target.value)}
             >
