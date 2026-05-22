@@ -1,0 +1,5 @@
+# metric_direction: higher_is_better
+iteration	commit	metric	delta	guard	guard-metric	status	description
+0	a1b2c3d	72.0	0.0	pass	-	baseline	initial state
+1	b2c3d4e	74.5	+2.5	pass	-	keep	add auth middleware tests
+2	-	73.1	-1.4	-	-	discard	refactor test helpers
