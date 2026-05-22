@@ -248,6 +248,8 @@ class RunInfo:
     row_count: int
     metric_direction: Optional[str] = None
     headers: List[str] = field(default_factory=list)
+    project_id: str = "."
+    project_path: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -258,4 +260,6 @@ class RunInfo:
             "rowCount": self.row_count,
             "metricDirection": self.metric_direction,
             "headers": self.headers,
+            "projectId": self.project_id,
+            "projectPath": self.project_path,
         }
