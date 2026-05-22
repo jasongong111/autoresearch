@@ -61,7 +61,7 @@ Strategic milestones and feature development phases for autoresearch.
 - IDE plugins and editor extensions
 - CI/CD pipeline integration
 - GitHub Actions workflows
-- Web dashboard for analysis results
+- Web dashboard for analysis results (v1 shipped — see [dashboard/README.md](../dashboard/README.md))
 
 ### Phase 8: Advanced Features
 - Custom persona templates
