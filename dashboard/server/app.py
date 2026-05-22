@@ -42,6 +42,8 @@ def create_app(state: DashboardState, static_dir: Optional[Path] = None) -> Fast
             "project": str(state.project_root),
             "runCount": len(state.runs),
             "activeRunId": state.active_run_id,
+            "conversationCount": len(state.get_conversations()),
+            "transcriptDirs": [str(d) for d in state.transcript_dirs],
         }
 
     @app.get("/api/runs")
@@ -67,6 +69,23 @@ def create_app(state: DashboardState, static_dir: Optional[Path] = None) -> Fast
     def get_trace() -> dict:
         state.refresh_runs()
         return {"events": state.get_trace()}
+
+    @app.get("/api/conversations")
+    def list_conversations() -> dict:
+        return {
+            "conversations": state.get_conversations(),
+            "transcriptDirs": [str(d) for d in state.transcript_dirs],
+        }
+
+    @app.get("/api/conversations/{conversation_id:path}/turns")
+    def get_conversation_turns(conversation_id: str) -> dict:
+        conv = state.get_conversation(conversation_id)
+        if not conv:
+            raise HTTPException(404, f"Conversation not found: {conversation_id}")
+        return {
+            "conversation": conv,
+            "turns": state.get_conversation_turns(conversation_id),
+        }
 
     @app.get("/api/runs/{run_id:path}/artifacts")
     def get_run_artifacts(run_id: str) -> dict:
