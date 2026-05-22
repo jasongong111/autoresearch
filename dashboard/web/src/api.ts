@@ -1,4 +1,14 @@
-import type { GitCommit, Iteration, Run, Session, Summary, TraceArtifact, TraceEvent } from "./types";
+import type {
+  ConversationInfo,
+  ConversationTurn,
+  GitCommit,
+  Iteration,
+  Run,
+  Session,
+  Summary,
+  TraceArtifact,
+  TraceEvent,
+} from "./types";
 
 const API = "/api";
 
@@ -53,8 +63,34 @@ export async function fetchRunArtifacts(runId: string): Promise<TraceArtifact[]>
   return data.artifacts ?? [];
 }
 
+export async function fetchConversations(): Promise<{
+  conversations: ConversationInfo[];
+  transcriptDirs: string[];
+}> {
+  const r = await fetch(`${API}/conversations`);
+  if (!r.ok) return { conversations: [], transcriptDirs: [] };
+  const data = await r.json();
+  return {
+    conversations: data.conversations ?? [],
+    transcriptDirs: data.transcriptDirs ?? [],
+  };
+}
+
+export async function fetchConversationTurns(
+  conversationId: string
+): Promise<{ conversation: ConversationInfo; turns: ConversationTurn[] } | null> {
+  const r = await fetch(`${API}/conversations/${encodeURI(conversationId)}/turns`);
+  if (!r.ok) return null;
+  return r.json();
+}
+
 export function subscribeEvents(
-  onEvent: (event: { type: string; runId?: string; iterationCount?: number }) => void
+  onEvent: (event: {
+    type: string;
+    runId?: string;
+    iterationCount?: number;
+    conversationId?: string;
+  }) => void
 ): () => void {
   const es = new EventSource(`${API}/events`);
   es.onmessage = (e) => {
