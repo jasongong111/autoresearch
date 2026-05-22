@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Activity,
   GitBranch,
+  BarChart3,
   LayoutDashboard,
   MessageSquare,
   Moon,
@@ -19,13 +20,15 @@ import {
   fetchHealth,
   fetchIterations,
   fetchRun,
+  fetchRunAnalytics,
   fetchRunArtifacts,
+  fetchRunTrace,
   fetchRuns,
   fetchSummary,
-  fetchTrace,
   subscribeEvents,
 } from "./api";
 import AgentTrace from "./AgentTrace";
+import Analytics from "./Analytics";
 import ConversationView from "./ConversationView";
 import GitTimeline from "./GitTimeline";
 import IterationTable from "./IterationTable";
@@ -38,14 +41,16 @@ import type {
   Run,
   Session,
   Summary,
+  TraceAnalytics,
   TraceArtifact,
   TraceEvent,
 } from "./types";
 
-type Tab = "overview" | "iterations" | "conversation" | "trace" | "git";
+type Tab = "overview" | "analytics" | "iterations" | "conversation" | "trace" | "git";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "iterations", label: "Iterations", icon: Table2 },
   { id: "conversation", label: "Conversation", icon: MessageSquare },
   { id: "trace", label: "Agent trace", icon: ScrollText },
@@ -98,6 +103,7 @@ export default function App() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [iterations, setIterations] = useState<Iteration[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [analytics, setAnalytics] = useState<TraceAnalytics | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [commits, setCommits] = useState<GitCommit[]>([]);
   const [traceEvents, setTraceEvents] = useState<TraceEvent[]>([]);
@@ -146,17 +152,19 @@ export default function App() {
   }, [loadConversation]);
 
   const loadRunData = useCallback(async (runId: string) => {
-    const [iters, sum, runDetail, trace, arts] = await Promise.all([
+    const [iters, sum, runDetail, trace, analyticsData, arts] = await Promise.all([
       fetchIterations(runId),
       fetchSummary(runId),
       fetchRun(runId),
-      fetchTrace(),
+      fetchRunTrace(runId),
+      fetchRunAnalytics(runId),
       fetchRunArtifacts(runId),
     ]);
     setIterations(iters);
     setSummary(sum);
     setSession(runDetail.session);
     setTraceEvents(trace);
+    setAnalytics(analyticsData);
     setArtifacts(arts);
   }, []);
 
@@ -210,7 +218,10 @@ export default function App() {
         fetchGitCommits().then(setCommits);
       }
       if (event.type === "trace_updated") {
-        fetchTrace().then(setTraceEvents);
+        if (selectedRunId) {
+          fetchRunTrace(selectedRunId).then(setTraceEvents);
+          fetchRunAnalytics(selectedRunId).then(setAnalytics);
+        }
         if (selectedRunId && (!event.runId || event.runId === selectedRunId)) {
           fetchRunArtifacts(selectedRunId).then(setArtifacts);
         }
@@ -305,6 +316,21 @@ export default function App() {
               </div>
             </div>
           </>
+        );
+
+      case "analytics":
+        return (
+          <div className="panel">
+            <div className="panel-header">
+              <h2 className="panel-title">Loop analytics</h2>
+              <span className="badge outline">
+                {analytics?.traces.total ?? 0} traces
+              </span>
+            </div>
+            <div className="panel-body">
+              <Analytics analytics={analytics} />
+            </div>
+          </div>
         );
 
       case "iterations":
@@ -447,6 +473,9 @@ export default function App() {
             {selectedRun && (
               <span className="badge accent">{selectedRun.command}</span>
             )}
+            {selectedRun?.projectId && selectedRun.projectId !== "." && (
+              <span className="badge outline">{selectedRun.projectId}</span>
+            )}
             <h1 className="page-title">
               {selectedRun ? selectedRun.runId : "Dashboard"}
             </h1>
@@ -461,6 +490,7 @@ export default function App() {
                 <optgroup key={cmd} label={cmd}>
                   {cmdRuns.map((r) => (
                     <option key={r.runId} value={r.runId}>
+                      {r.projectId && r.projectId !== "." ? `[${r.projectId}] ` : ""}
                       {r.runId} ({r.rowCount} rows)
                     </option>
                   ))}
