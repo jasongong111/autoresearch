@@ -18,7 +18,7 @@ from .conversations import (
     get_conversation_turns,
     resolve_transcript_dirs,
 )
-from .trace import discover_run_artifacts, parse_trace_jsonl, trace_file_path
+from .trace import discover_run_artifacts, parse_trace_analytics, parse_trace_jsonl, trace_file_path
 
 
 class DashboardState:
@@ -35,6 +35,7 @@ class DashboardState:
         self._last_git_poll = 0.0
         self._session: Optional[dict] = None
         self._trace_events: List[dict] = []
+        self._trace_analytics: dict = {}
         self._trace_mtime: float = 0.0
         self._artifacts_cache: Dict[str, List[dict]] = {}
         self._conversations: List[dict] = []
@@ -54,23 +55,35 @@ class DashboardState:
             self._load_conversations(force=True)
 
     def _load_session(self) -> None:
-        session_path = self.project_root / ".autoresearch" / "session.json"
+        self._session = self._read_session(self.project_root)
+
+    def _read_session(self, project_root: Path) -> Optional[dict]:
+        session_path = project_root / ".autoresearch" / "session.json"
         if session_path.exists():
             try:
-                self._session = json.loads(session_path.read_text(encoding="utf-8"))
+                return json.loads(session_path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
-                self._session = None
-        else:
-            self._session = None
+                return None
+        return None
 
     def get_session(self) -> Optional[dict]:
         return self._session
+
+    def _project_root_for_run(self, run_id: str) -> Path:
+        run = self.get_run(run_id)
+        if run and run.project_path:
+            return Path(run.project_path)
+        return self.project_root
+
+    def get_run_session(self, run_id: str) -> Optional[dict]:
+        return self._read_session(self._project_root_for_run(run_id))
 
     def _load_trace(self, force: bool = False) -> bool:
         path = trace_file_path(self.project_root)
         if not path.is_file():
             if self._trace_events:
                 self._trace_events = []
+                self._trace_analytics = {}
                 self._trace_mtime = 0.0
                 return True
             return False
@@ -79,6 +92,7 @@ class DashboardState:
             return False
         events = parse_trace_jsonl(path)
         self._trace_events = [e.to_dict() for e in events]
+        self._trace_analytics = parse_trace_analytics(path)
         self._trace_mtime = mtime
         return True
 
@@ -86,6 +100,18 @@ class DashboardState:
         with self._lock:
             self._load_trace()
             return list(self._trace_events)
+
+    def get_analytics(self) -> dict:
+        with self._lock:
+            self._load_trace()
+            return dict(self._trace_analytics)
+
+    def get_run_trace(self, run_id: str) -> List[dict]:
+        path = trace_file_path(self._project_root_for_run(run_id))
+        return [event.to_dict() for event in parse_trace_jsonl(path)]
+
+    def get_run_analytics(self, run_id: str) -> dict:
+        return parse_trace_analytics(trace_file_path(self._project_root_for_run(run_id)))
 
     def get_run_artifacts(self, run_id: str) -> List[dict]:
         with self._lock:
