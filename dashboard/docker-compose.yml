@@ -1,0 +1,27 @@
+# Autoresearch dashboard — Docker Compose for local runs and cloud-style deployment.
+#
+# From repo root:
+#   docker compose -f dashboard/docker-compose.yml up --build
+#
+# Open http://127.0.0.1:3847
+
+services:
+  dashboard:
+    build:
+      context: ..
+      dockerfile: dashboard/Dockerfile
+    image: autoresearch-dashboard:latest
+    ports:
+      - "${DASHBOARD_PORT:-3847}:3847"
+    environment:
+      DASHBOARD_HOST: 0.0.0.0
+      DASHBOARD_PORT: "3847"
+      # Workspace root: discovers tasks/* child projects when present
+      DASHBOARD_PROJECT: /workspace
+    volumes:
+      # Mount the repo (or any workspace) read-only; agents write logs on the host
+      - ${DASHBOARD_WORKSPACE:-..}:/workspace:ro
+      # Optional: Cursor agent transcripts (uncomment and set path on host)
+      # - ${CURSOR_TRANSCRIPTS_DIR}:/transcripts:ro
+    # command: ["--transcripts-dir", "/transcripts"]
+    restart: unless-stopped
