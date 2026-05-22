@@ -2,6 +2,8 @@ export interface Run {
   runId: string;
   command: string;
   path: string;
+  projectId: string;
+  projectPath: string;
   lastModified: number;
   rowCount: number;
   metricDirection?: string;
@@ -65,6 +67,88 @@ export interface TraceArtifact {
   content: string;
   lastModified: number;
   kind: "markdown" | "jsonl";
+}
+
+export interface AnalyticsSummaryRow {
+  name: string;
+  source?: string;
+  dataType?: string;
+  count: number;
+  average?: number | null;
+  zeros?: number;
+  ones?: number;
+}
+
+export interface AnalyticsSeriesRow {
+  bucket: string;
+  [key: string]: string | number | Record<string, number> | null;
+}
+
+export interface AnalyticsLatencyRow {
+  name: string;
+  p50Ms: number | null;
+  p75Ms?: number | null;
+  p90Ms: number | null;
+  p95Ms: number | null;
+  p99Ms: number | null;
+}
+
+export interface ScoreAnalytics {
+  name: string;
+  source: string;
+  dataType: string;
+  histogram: { bucket: string; count: number }[];
+  categoricalBreakdown: { category: string; count: number }[];
+  movingAverage: AnalyticsSeriesRow[];
+  categoricalOverTime: { bucket: string; counts: Record<string, number> }[];
+}
+
+export interface TraceAnalytics {
+  traces: {
+    total: number;
+    byName: { name: string; count: number }[];
+  };
+  modelCosts: {
+    totalCostUsd: number;
+    byModel: { model: string; tokens: number; costUsd: number }[];
+  };
+  scores: {
+    total: number;
+    summary: AnalyticsSummaryRow[];
+  };
+  timeSeries: {
+    traceObservationByLevel: {
+      bucket: string;
+      traceCount: number;
+      observationCount: number;
+      observationsByLevel: Record<string, number>;
+    }[];
+    observationsByLevel: {
+      bucket: string;
+      observationsByLevel: Record<string, number>;
+    }[];
+  };
+  modelUsage: {
+    models: string[];
+    costByModel: AnalyticsSeriesRow[];
+    costByType: AnalyticsSeriesRow[];
+    usageByModel: AnalyticsSeriesRow[];
+    usageByType: AnalyticsSeriesRow[];
+  };
+  userConsumption: {
+    costByUser: { user: string; totalCostUsd: number }[];
+    traceCountByUser: { user: string; traceCount: number }[];
+  };
+  scoreTimeSeries: AnalyticsSeriesRow[];
+  latencies: {
+    trace: AnalyticsLatencyRow[];
+    generation: AnalyticsLatencyRow[];
+    observation: AnalyticsLatencyRow[];
+  };
+  modelLatencies: {
+    series: (AnalyticsSeriesRow & { model: string })[];
+  };
+  scoreAnalytics: Record<string, ScoreAnalytics>;
 }
 
 export type ContentBlock =
