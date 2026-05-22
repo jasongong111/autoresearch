@@ -39,7 +39,7 @@ export default function IterationTable({ iterations }: Props) {
         <tbody>
           {[...iterations].reverse().map((it, i) => (
             <tr key={`${it.index}-${i}`}>
-              <td>{it.index}</td>
+              <td className="mono">{it.index}</td>
               <td>{it.status || "—"}</td>
               <td>
                 <span className={chipClass(it.outcome)}>{it.outcome}</span>
