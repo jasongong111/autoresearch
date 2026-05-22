@@ -66,3 +66,27 @@ export interface TraceArtifact {
   lastModified: number;
   kind: "markdown" | "jsonl";
 }
+
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "thinking"; text: string; redacted?: boolean }
+  | { type: "tool_use"; name: string; input: Record<string, unknown>; description?: string; subagentType?: string }
+  | { type: "mcp"; server: string; toolName: string; arguments: Record<string, unknown> }
+  | { type: "tool_result"; toolName: string; content: unknown; isError?: boolean }
+  | { type: string; [key: string]: unknown };
+
+export interface ConversationInfo {
+  id: string;
+  title: string;
+  path: string;
+  lastModified: number;
+  turnCount: number;
+  kind: "cursor" | "subagent" | "local";
+  parentId?: string | null;
+}
+
+export interface ConversationTurn {
+  index: number;
+  role: string;
+  blocks: ContentBlock[];
+}
