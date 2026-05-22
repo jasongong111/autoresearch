@@ -55,7 +55,7 @@ docker run --rm -p 3847:3847 \
 | `DASHBOARD_HOST` | `0.0.0.0` | Bind address (use `0.0.0.0` in containers) |
 | `DASHBOARD_PORT` | `3847` | HTTP port inside the container |
 
-Optional CLI args are passed through the entrypoint, e.g. `--transcripts-dir /transcripts` when you mount transcripts.
+Optional CLI args are passed through the entrypoint, e.g. `--transcripts-dir /transcripts` when you mount transcripts. Docker Compose sets `CURSOR_TRANSCRIPTS_DIR` in `dashboard/.env` so the **Conversation** tab streams Cursor agent transcripts in near real time (~2s).
 
 ### Cloud deployment notes
 
@@ -66,6 +66,13 @@ Optional CLI args are passed through the entrypoint, e.g. `--transcripts-dir /tr
 - Git timeline requires `.git` inside the mounted workspace; install is already in the image.
 
 While `/autoresearch` (or any subcommand) runs in that project, the dashboard updates automatically when TSV rows are appended. If you start the dashboard at a workspace root that contains `tasks/`, each immediate `tasks/*` directory is treated as a child project and its runs appear in the same dashboard.
+
+### Live agent conversations
+
+The **Conversation** tab polls Cursor transcript JSONL every ~2 seconds (plus filesystem events when available). Enable **Follow live** to auto-select the newest session and scroll as new turns arrive. Sources:
+
+- Cursor: `~/.cursor/projects/{slug}/agent-transcripts/` (auto-detected locally; mount into Docker via `CURSOR_TRANSCRIPTS_DIR`)
+- Project mirror: `.autoresearch/conversation.jsonl` under the workspace or any `tasks/*` project
 
 ## Conda environment
 
@@ -141,7 +148,8 @@ If the agent writes `.autoresearch/session.json` at loop start, the dashboard sh
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/health` | Server status and watched project |
-| `GET /api/runs` | Discovered log files |
+| `GET /api/projects` | Watched project roots (`tasks/*` included even without runs) |
+| `GET /api/runs` | Discovered log files and project list |
 | `GET /api/runs/{id}/iterations` | Normalized iteration rows |
 | `GET /api/runs/{id}/summary` | Aggregates (keeps, discards, stuck warning) |
 | `GET /api/git/commits` | Recent `experiment:` commits |
