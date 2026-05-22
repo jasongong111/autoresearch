@@ -83,11 +83,25 @@ def resolve_transcript_dirs(
 def discover_conversations(
     project_root: Path, transcript_dirs: Sequence[Path]
 ) -> List[ConversationInfo]:
-    conversations: List[ConversationInfo] = []
+    from .discovery import discover_project_roots
 
-    local_path = conversation_file_path(project_root)
-    if local_path.is_file():
-        conversations.append(_conversation_info_from_path("local", local_path, "local", None))
+    conversations: List[ConversationInfo] = []
+    seen_local: set[str] = set()
+    project_root = project_root.resolve()
+
+    for root in discover_project_roots(project_root):
+        local_path = conversation_file_path(root)
+        if not local_path.is_file():
+            continue
+        key = str(local_path.resolve())
+        if key in seen_local:
+            continue
+        seen_local.add(key)
+        if root == project_root:
+            conv_id = "local"
+        else:
+            conv_id = f"{root.relative_to(project_root).as_posix()}/local"
+        conversations.append(_conversation_info_from_path(conv_id, local_path, "local", None))
 
     for tdir in transcript_dirs:
         if not tdir.is_dir():
@@ -276,3 +290,31 @@ def _strip_user_query(text: str) -> str:
 
 def get_conversation_turns(path: Path) -> List[dict]:
     return [t.to_dict() for t in parse_transcript_jsonl(path)]
+
+
+def conversation_sources_fingerprint(
+    project_root: Path, transcript_dirs: Sequence[Path]
+) -> str:
+    """Stable fingerprint from mtimes + sizes for live conversation polling."""
+    from .discovery import discover_project_roots
+
+    parts: List[str] = []
+    project_root = project_root.resolve()
+    for root in discover_project_roots(project_root):
+        local = conversation_file_path(root)
+        if local.is_file():
+            try:
+                stat = local.stat()
+                parts.append(f"{local.resolve()}:{stat.st_mtime_ns}:{stat.st_size}")
+            except OSError:
+                continue
+    for tdir in transcript_dirs:
+        if not tdir.is_dir():
+            continue
+        for path in sorted(tdir.rglob("*.jsonl")):
+            try:
+                stat = path.stat()
+                parts.append(f"{path.resolve()}:{stat.st_mtime_ns}:{stat.st_size}")
+            except OSError:
+                continue
+    return "|".join(parts)
