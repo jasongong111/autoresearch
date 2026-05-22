@@ -157,6 +157,21 @@ Before looping, Claude performs a one-time setup:
 
 ---
 
+## Dashboard
+
+Monitor autoresearch runs in real time (iteration TSV logs, git `experiment:` commits, all subcommands):
+
+```bash
+./dashboard/scripts/setup-env.sh
+conda activate autoresearch-dashboard
+cd dashboard/web && npm install && npm run build && cd ../..
+./bin/autoresearch-dashboard --project .
+```
+
+Open http://127.0.0.1:3847 — see [dashboard/README.md](dashboard/README.md).
+
+---
+
 ## Quick Start
 
 ### Claude Code
