@@ -70,6 +70,23 @@ def create_app(state: DashboardState, static_dir: Optional[Path] = None) -> Fast
         state.refresh_runs()
         return {"events": state.get_trace()}
 
+    @app.get("/api/analytics")
+    def get_analytics() -> dict:
+        state.refresh_runs()
+        return state.get_analytics()
+
+    @app.get("/api/runs/{run_id:path}/trace")
+    def get_run_trace(run_id: str) -> dict:
+        if not state.get_run(run_id):
+            raise HTTPException(404, f"Run not found: {run_id}")
+        return {"events": state.get_run_trace(run_id)}
+
+    @app.get("/api/runs/{run_id:path}/analytics")
+    def get_run_analytics(run_id: str) -> dict:
+        if not state.get_run(run_id):
+            raise HTTPException(404, f"Run not found: {run_id}")
+        return state.get_run_analytics(run_id)
+
     @app.get("/api/conversations")
     def list_conversations() -> dict:
         return {
@@ -98,7 +115,7 @@ def create_app(state: DashboardState, static_dir: Optional[Path] = None) -> Fast
         run = state.get_run(run_id)
         if not run:
             raise HTTPException(404, f"Run not found: {run_id}")
-        session = state.get_session()
+        session = state.get_run_session(run_id)
         return {
             **run.to_dict(),
             "session": session,
