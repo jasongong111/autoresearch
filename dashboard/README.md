@@ -27,7 +27,45 @@ Open **http://127.0.0.1:3847** in your browser.
 
 `./bin/autoresearch-dashboard` automatically uses the `autoresearch-dashboard` conda env when it exists, even if you forgot to activate it.
 
-While `/autoresearch` (or any subcommand) runs in that project, the dashboard updates automatically when TSV rows are appended.
+## Docker (local and cloud)
+
+Build and run from the **autoresearch repo root** so the image can watch the workspace (including `tasks/*` projects):
+
+```bash
+docker compose -f dashboard/docker-compose.yml up --build
+```
+
+Open **http://127.0.0.1:3847**. The compose file mounts the repo at `/workspace` inside the container (read-only). Set `DASHBOARD_WORKSPACE` in `dashboard/.env` if you want to watch a different host directory.
+
+### Plain `docker run`
+
+```bash
+docker build -f dashboard/Dockerfile -t autoresearch-dashboard .
+docker run --rm -p 3847:3847 \
+  -v "$(pwd):/workspace:ro" \
+  -e DASHBOARD_PROJECT=/workspace \
+  autoresearch-dashboard
+```
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DASHBOARD_PROJECT` | `/workspace` | Directory watched for TSV logs and `.autoresearch/` |
+| `DASHBOARD_HOST` | `0.0.0.0` | Bind address (use `0.0.0.0` in containers) |
+| `DASHBOARD_PORT` | `3847` | HTTP port inside the container |
+
+Optional CLI args are passed through the entrypoint, e.g. `--transcripts-dir /transcripts` when you mount transcripts.
+
+### Cloud deployment notes
+
+- Expose port `3847` (or map host port via `DASHBOARD_PORT`).
+- Mount a persistent volume at `/workspace` containing agent run logs (or sync logs into that path).
+- The image includes a `GET /api/health` health check for load balancers.
+- For Kubernetes, set `livenessProbe` / `readinessProbe` on `/api/health`.
+- Git timeline requires `.git` inside the mounted workspace; install is already in the image.
+
+While `/autoresearch` (or any subcommand) runs in that project, the dashboard updates automatically when TSV rows are appended. If you start the dashboard at a workspace root that contains `tasks/`, each immediate `tasks/*` directory is treated as a child project and its runs appear in the same dashboard.
 
 ## Conda environment
 
@@ -108,6 +146,9 @@ If the agent writes `.autoresearch/session.json` at loop start, the dashboard sh
 | `GET /api/runs/{id}/summary` | Aggregates (keeps, discards, stuck warning) |
 | `GET /api/git/commits` | Recent `experiment:` commits |
 | `GET /api/trace` | Live agent trace events from `.autoresearch/trace.jsonl` |
+| `GET /api/analytics` | Aggregated trace, model cost/usage, score, user, and latency metrics from `.autoresearch/trace.jsonl` |
+| `GET /api/runs/{id}/trace` | Trace events from the selected run's project root |
+| `GET /api/runs/{id}/analytics` | Analytics from the selected run's project root |
 | `GET /api/conversations` | Agent conversation sessions (Cursor transcripts + local JSONL) |
 | `GET /api/conversations/{id}/turns` | Full conversation turns with text, thinking, tools, MCP |
 | `GET /api/runs/{id}/artifacts` | Trace markdown/JSONL files in the run directory |
