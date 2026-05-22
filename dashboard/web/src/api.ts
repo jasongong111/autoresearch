@@ -3,6 +3,7 @@ import type {
   ConversationTurn,
   GitCommit,
   Iteration,
+  Project,
   Run,
   Session,
   Summary,
@@ -18,7 +19,18 @@ export async function fetchHealth(): Promise<{ project: string; activeRunId: str
   return r.json();
 }
 
-export async function fetchRuns(): Promise<{ runs: Run[]; activeRunId: string | null }> {
+export async function fetchProjects(): Promise<Project[]> {
+  const r = await fetch(`${API}/projects`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.projects ?? [];
+}
+
+export async function fetchRuns(): Promise<{
+  runs: Run[];
+  projects: Project[];
+  activeRunId: string | null;
+}> {
   const r = await fetch(`${API}/runs`);
   return r.json();
 }
