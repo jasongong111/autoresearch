@@ -6,6 +6,7 @@ import type {
   Run,
   Session,
   Summary,
+  TraceAnalytics,
   TraceArtifact,
   TraceEvent,
 } from "./types";
@@ -54,6 +55,25 @@ export async function fetchTrace(): Promise<TraceEvent[]> {
   if (!r.ok) return [];
   const data = await r.json();
   return data.events ?? [];
+}
+
+export async function fetchAnalytics(): Promise<TraceAnalytics | null> {
+  const r = await fetch(`${API}/analytics`);
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function fetchRunTrace(runId: string): Promise<TraceEvent[]> {
+  const r = await fetch(`${API}/runs/${encodeURI(runId)}/trace`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.events ?? [];
+}
+
+export async function fetchRunAnalytics(runId: string): Promise<TraceAnalytics | null> {
+  const r = await fetch(`${API}/runs/${encodeURI(runId)}/analytics`);
+  if (!r.ok) return null;
+  return r.json();
 }
 
 export async function fetchRunArtifacts(runId: string): Promise<TraceArtifact[]> {
