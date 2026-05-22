@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+export PYTHONPATH="${ROOT}:${PYTHONPATH:-}"
+
+ENV_NAME="autoresearch-dashboard"
+MAIN_ARGS=(-m dashboard.server.main "$@")
+
+# Prefer active conda env when it matches the dashboard env
+if [[ "${CONDA_DEFAULT_ENV:-}" == "${ENV_NAME}" ]] && command -v python >/dev/null 2>&1; then
+  exec python "${MAIN_ARGS[@]}"
+fi
+
+# Use named conda env if it exists (no activation required)
+if command -v conda >/dev/null 2>&1; then
+  if conda env list 2>/dev/null | awk '{print $1}' | grep -qx "${ENV_NAME}"; then
+    exec conda run --no-capture-output -n "${ENV_NAME}" \
+      env PYTHONPATH="${PYTHONPATH}" \
+      python "${MAIN_ARGS[@]}"
+  fi
+fi
+
+# Fallback: system Python 3.11+
+PYTHON=""
+for candidate in python3.12 python3.11 python3; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    PYTHON="$candidate"
+    break
+  fi
+done
+
+if [[ -z "${PYTHON}" ]]; then
+  echo "Error: no Python found. Create the conda env first:" >&2
+  echo "  ./dashboard/scripts/setup-env.sh" >&2
+  exit 1
+fi
+
+echo "Warning: conda env '${ENV_NAME}' not found; using ${PYTHON}." >&2
+echo "  Run: ./dashboard/scripts/setup-env.sh" >&2
+exec "${PYTHON}" "${MAIN_ARGS[@]}"
