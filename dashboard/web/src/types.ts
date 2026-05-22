@@ -1,3 +1,11 @@
+export interface Project {
+  projectId: string;
+  projectPath: string;
+  name: string;
+  runCount: number;
+  isTask: boolean;
+}
+
 export interface Run {
   runId: string;
   command: string;
