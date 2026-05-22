@@ -84,6 +84,16 @@ log_trace 1 decide "keep — metric improved, guard passed" success
 
 Subcommands that write markdown trace files (`persona-debates.md`, `judge-transcripts.md`, `lineage.md`, etc.) are also surfaced automatically in the dashboard when their TSV log is selected.
 
+### Agent conversations in the dashboard
+
+The dashboard reads full agent conversations (user messages, assistant text, thinking, tool calls, MCP calls, tool results) from:
+
+1. **Cursor auto-detect** — `~/.cursor/projects/{project-slug}/agent-transcripts/` (including subagent sessions)
+2. **Explicit path** — `./bin/autoresearch-dashboard --transcripts-dir /path/to/agent-transcripts`
+3. **Project mirror** — `.autoresearch/conversation.jsonl` (NDJSON, same format as Cursor exports)
+
+Cursor may redact extended thinking as `[REDACTED]` in exported JSONL; explicit `thinking` blocks are shown when present.
+
 ## Logging Function
 
 Called at Phase 7 of every iteration after the keep/discard/crash decision:
