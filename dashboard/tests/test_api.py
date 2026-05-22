@@ -56,6 +56,25 @@ def test_trace_and_artifacts(client: TestClient, tmp_path: Path):
     assert "artifacts" in artifacts
 
 
+def test_projects_api(client: TestClient, tmp_path: Path):
+    task_with_runs = tmp_path / "tasks" / "agentic-skill-demo"
+    task_with_runs.mkdir(parents=True)
+    (task_with_runs / "autoresearch-results.tsv").write_text(
+        (FIXTURES / "autoresearch-results.tsv").read_text()
+    )
+    (tmp_path / "tasks" / "gemma4-skill-optimization").mkdir(parents=True)
+    state = client.app.state.dashboard  # type: ignore[attr-defined]
+    state.refresh_runs()
+
+    projects = client.get("/api/projects").json()["projects"]
+    project_ids = {p["projectId"] for p in projects}
+    assert project_ids == {".", "tasks/agentic-skill-demo", "tasks/gemma4-skill-optimization"}
+
+    runs = client.get("/api/runs").json()
+    assert "projects" in runs
+    assert len(runs["projects"]) == 3
+
+
 def test_task_project_trace_api(client: TestClient, tmp_path: Path):
     task_project = tmp_path / "tasks" / "agentic-skill-demo"
     task_project.mkdir(parents=True)
