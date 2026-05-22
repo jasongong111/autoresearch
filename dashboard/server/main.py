@@ -11,7 +11,12 @@ import uvicorn
 
 from .app import create_app
 from .state import DashboardState
-from .watcher import start_periodic_rescan, start_transcript_watcher, start_watcher
+from .watcher import (
+    start_conversation_poll,
+    start_periodic_rescan,
+    start_transcript_watcher,
+    start_watcher,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     state = DashboardState(project, transcript_dirs=args.transcripts_dir)
     observer = start_watcher(state)
     transcript_observer = start_transcript_watcher(state)
+    start_conversation_poll(state)
     start_periodic_rescan(state)
 
     app = create_app(state, static_dir=static_dir if static_dir.exists() else None)
