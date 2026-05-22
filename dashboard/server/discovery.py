@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List
 
 from .parsers import parse_tsv_rows, read_tsv_metadata
-from .schemas import LOG_SCHEMAS, RunInfo, command_from_path
+from .schemas import LOG_SCHEMAS, ProjectInfo, RunInfo, command_from_path
 
 
 def discover_project_roots(project_root: Path) -> List[Path]:
@@ -19,6 +19,29 @@ def discover_project_roots(project_root: Path) -> List[Path]:
             if child.is_dir() and not child.name.startswith("."):
                 roots.append(child.resolve())
     return roots
+
+
+def discover_projects(project_root: Path, runs: List[RunInfo]) -> List[ProjectInfo]:
+    """Return all watched project roots, including tasks/* dirs without runs yet."""
+    project_root = project_root.resolve()
+    run_counts: dict[str, int] = {}
+    for run in runs:
+        run_counts[run.project_id] = run_counts.get(run.project_id, 0) + 1
+
+    projects: List[ProjectInfo] = []
+    for scan_root in discover_project_roots(project_root):
+        project_id = "." if scan_root == project_root else scan_root.relative_to(project_root).as_posix()
+        name = project_root.name if project_id == "." else scan_root.name
+        projects.append(
+            ProjectInfo(
+                project_id=project_id,
+                project_path=str(scan_root),
+                name=name,
+                run_count=run_counts.get(project_id, 0),
+                is_task=project_id.startswith("tasks/"),
+            )
+        )
+    return projects
 
 
 def discover_runs(project_root: Path) -> List[RunInfo]:
