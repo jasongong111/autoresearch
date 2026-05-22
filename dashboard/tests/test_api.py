@@ -54,3 +54,19 @@ def test_trace_and_artifacts(client: TestClient, tmp_path: Path):
     run_id = runs["runs"][0]["runId"]
     artifacts = client.get(f"/api/runs/{run_id}/artifacts").json()
     assert "artifacts" in artifacts
+
+
+def test_conversations_api(client: TestClient, tmp_path: Path):
+    conv_dir = tmp_path / ".autoresearch"
+    conv_dir.mkdir()
+    (conv_dir / "conversation.jsonl").write_text(
+        (FIXTURES / "conversation.jsonl").read_text()
+    )
+    state = client.app.state.dashboard  # type: ignore[attr-defined]
+    state.refresh_runs()
+    listing = client.get("/api/conversations").json()
+    assert len(listing["conversations"]) >= 1
+    conv_id = listing["conversations"][0]["id"]
+    detail = client.get(f"/api/conversations/{conv_id}/turns").json()
+    assert len(detail["turns"]) >= 2
+    assert detail["turns"][0]["role"] == "user"
