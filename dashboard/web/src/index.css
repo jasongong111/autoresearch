@@ -1143,6 +1143,40 @@ td.mono,
   color: var(--muted-foreground);
 }
 
+.conv-live-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  user-select: none;
+}
+
+.conv-live-toggle input {
+  accent-color: var(--primary-accent, #4e46e5);
+}
+
+.conv-live-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #22c55e;
+  animation: conv-live-pulse 1s ease-in-out infinite;
+}
+
+@keyframes conv-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
 /* ——— Responsive ——— */
 @media (max-width: 768px) {
   .sidebar {
