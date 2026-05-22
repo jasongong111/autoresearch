@@ -11,7 +11,7 @@ import uvicorn
 
 from .app import create_app
 from .state import DashboardState
-from .watcher import start_periodic_rescan, start_watcher
+from .watcher import start_periodic_rescan, start_transcript_watcher, start_watcher
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,6 +30,13 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Path to built React static files (default: dashboard/web/dist)",
     )
+    parser.add_argument(
+        "--transcripts-dir",
+        type=Path,
+        action="append",
+        default=None,
+        help="Directory with agent conversation JSONL (repeatable). Auto-detects ~/.cursor/projects/.../agent-transcripts if omitted.",
+    )
     args = parser.parse_args(argv)
 
     project = args.project.resolve()
@@ -42,8 +49,9 @@ def main(argv: list[str] | None = None) -> int:
     if static_dir is None:
         static_dir = dashboard_root / "web" / "dist"
 
-    state = DashboardState(project)
+    state = DashboardState(project, transcript_dirs=args.transcripts_dir)
     observer = start_watcher(state)
+    transcript_observer = start_transcript_watcher(state)
     start_periodic_rescan(state)
 
     app = create_app(state, static_dir=static_dir if static_dir.exists() else None)
@@ -53,6 +61,9 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         observer.stop()
         observer.join(timeout=2)
+        if transcript_observer is not None:
+            transcript_observer.stop()
+            transcript_observer.join(timeout=2)
     return 0
 
 
