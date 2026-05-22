@@ -56,6 +56,43 @@ def test_trace_and_artifacts(client: TestClient, tmp_path: Path):
     assert "artifacts" in artifacts
 
 
+def test_task_project_trace_api(client: TestClient, tmp_path: Path):
+    task_project = tmp_path / "tasks" / "agentic-skill-demo"
+    task_project.mkdir(parents=True)
+    (task_project / "autoresearch-results.tsv").write_text(
+        (FIXTURES / "autoresearch-results.tsv").read_text()
+    )
+    trace_dir = task_project / ".autoresearch"
+    trace_dir.mkdir()
+    (trace_dir / "trace.jsonl").write_text((FIXTURES / "analytics_trace.jsonl").read_text())
+    state = client.app.state.dashboard  # type: ignore[attr-defined]
+    state.refresh_runs()
+
+    run_id = "tasks/agentic-skill-demo/autoresearch-results.tsv"
+    run = client.get(f"/api/runs/{run_id}").json()
+    assert run["projectId"] == "tasks/agentic-skill-demo"
+    assert run["projectPath"].endswith("tasks/agentic-skill-demo")
+
+    trace = client.get(f"/api/runs/{run_id}/trace").json()
+    assert trace["events"] == []
+    analytics = client.get(f"/api/runs/{run_id}/analytics").json()
+    assert analytics["traces"]["total"] == 3
+
+
+def test_analytics_api(client: TestClient, tmp_path: Path):
+    trace_dir = tmp_path / ".autoresearch"
+    trace_dir.mkdir()
+    (trace_dir / "trace.jsonl").write_text((FIXTURES / "analytics_trace.jsonl").read_text())
+    state = client.app.state.dashboard  # type: ignore[attr-defined]
+    state.refresh_runs()
+
+    analytics = client.get("/api/analytics").json()
+    assert analytics["traces"]["total"] == 3
+    assert analytics["modelCosts"]["totalCostUsd"] == 0.15
+    assert analytics["scores"]["total"] == 4
+    assert analytics["latencies"]["observation"][0]["p99Ms"] == 1500
+
+
 def test_conversations_api(client: TestClient, tmp_path: Path):
     conv_dir = tmp_path / ".autoresearch"
     conv_dir.mkdir()
