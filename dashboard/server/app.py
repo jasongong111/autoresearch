@@ -41,15 +41,23 @@ def create_app(state: DashboardState, static_dir: Optional[Path] = None) -> Fast
             "status": "ok",
             "project": str(state.project_root),
             "runCount": len(state.runs),
+            "projectCount": len(state.projects),
             "activeRunId": state.active_run_id,
             "conversationCount": len(state.get_conversations()),
             "transcriptDirs": [str(d) for d in state.transcript_dirs],
+        }
+
+    @app.get("/api/projects")
+    def list_projects() -> dict:
+        return {
+            "projects": [p.to_dict() for p in state.projects],
         }
 
     @app.get("/api/runs")
     def list_runs() -> dict:
         return {
             "runs": [r.to_dict() for r in state.runs],
+            "projects": [p.to_dict() for p in state.projects],
             "activeRunId": state.active_run_id,
         }
 
