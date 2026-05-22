@@ -33,3 +33,5 @@ dashboard/web/dist/
 !.env.example
 
 samples/
+*.pyc
+settings.local.json
