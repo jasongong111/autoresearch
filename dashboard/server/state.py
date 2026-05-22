@@ -9,11 +9,12 @@ import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 
-from .discovery import active_run_id, discover_runs
+from .discovery import active_run_id, discover_projects, discover_runs
 from .git_ops import ExperimentCommit, commit_diff_stat, list_experiment_commits
 from .parsers import compute_summary, parse_log_file
-from .schemas import RunInfo
+from .schemas import ProjectInfo, RunInfo
 from .conversations import (
+    conversation_sources_fingerprint,
     discover_conversations,
     get_conversation_turns,
     resolve_transcript_dirs,
@@ -26,6 +27,7 @@ class DashboardState:
         self.project_root = project_root.resolve()
         self.transcript_dirs = resolve_transcript_dirs(self.project_root, transcript_dirs)
         self.runs: List[RunInfo] = []
+        self.projects: List[ProjectInfo] = []
         self.iterations_cache: Dict[str, List[dict]] = {}
         self.summary_cache: Dict[str, dict] = {}
         self.git_commits: List[ExperimentCommit] = []
@@ -40,7 +42,7 @@ class DashboardState:
         self._artifacts_cache: Dict[str, List[dict]] = {}
         self._conversations: List[dict] = []
         self._conversation_turns_cache: Dict[str, List[dict]] = {}
-        self._conversations_mtime: float = 0.0
+        self._conversations_fingerprint: str = ""
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
@@ -49,6 +51,7 @@ class DashboardState:
     def refresh_runs(self) -> None:
         with self._lock:
             self.runs = discover_runs(self.project_root)
+            self.projects = discover_projects(self.project_root, self.runs)
             self.active_run_id = active_run_id(self.runs)
             self._load_session()
             self._load_trace(force=True)
@@ -127,30 +130,32 @@ class DashboardState:
         with self._lock:
             self._artifacts_cache.pop(run_id, None)
 
-    def _conversation_fingerprint(self) -> float:
-        latest = 0.0
-        local = self.project_root / ".autoresearch" / "conversation.jsonl"
-        if local.is_file():
-            latest = max(latest, local.stat().st_mtime)
-        for tdir in self.transcript_dirs:
-            if not tdir.is_dir():
-                continue
-            for path in tdir.rglob("*.jsonl"):
-                try:
-                    latest = max(latest, path.stat().st_mtime)
-                except OSError:
-                    continue
-        return latest
+    def _conversation_fingerprint(self) -> str:
+        return conversation_sources_fingerprint(self.project_root, self.transcript_dirs)
 
     def _load_conversations(self, force: bool = False) -> bool:
         fp = self._conversation_fingerprint()
-        if not force and fp == self._conversations_mtime:
+        if not force and fp == self._conversations_fingerprint:
             return False
         conversations = discover_conversations(self.project_root, self.transcript_dirs)
         self._conversations = [c.to_dict() for c in conversations]
-        self._conversations_mtime = fp
+        self._conversations_fingerprint = fp
         self._conversation_turns_cache.clear()
         return True
+
+    def poll_conversations(self) -> None:
+        """Fast poll for transcript append — publishes SSE when content changes."""
+        fp = self._conversation_fingerprint()
+        if fp == self._conversations_fingerprint:
+            return
+        latest_id: Optional[str] = None
+        with self._lock:
+            self._load_conversations(force=True)
+            if self._conversations:
+                latest_id = self._conversations[0]["id"]
+        self._schedule_publish(
+            {"type": "conversation_updated", "conversationId": latest_id}
+        )
 
     def get_conversations(self) -> List[dict]:
         with self._lock:
@@ -176,12 +181,17 @@ class DashboardState:
             self._conversation_turns_cache[conversation_id] = turns
         return turns
 
-    def on_conversation_changed(self) -> None:
+    def on_conversation_changed(self, conversation_id: Optional[str] = None) -> None:
         changed = False
         with self._lock:
             changed = self._load_conversations(force=True)
         if changed:
-            self._schedule_publish({"type": "conversation_updated"})
+            payload: Dict[str, Any] = {"type": "conversation_updated"}
+            if conversation_id:
+                payload["conversationId"] = conversation_id
+            elif self._conversations:
+                payload["conversationId"] = self._conversations[0]["id"]
+            self._schedule_publish(payload)
 
     def invalidate_run(self, run_id: str) -> None:
         with self._lock:
