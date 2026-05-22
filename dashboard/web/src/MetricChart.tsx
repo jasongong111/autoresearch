@@ -46,17 +46,23 @@ export default function MetricChart({ command, iterations }: Props) {
                 y={y}
                 width={barW * 0.7}
                 height={h}
-                fill="#f85149"
-                opacity={0.8}
+                className="chart-error"
+                opacity={0.85}
                 rx={2}
               />
-              <text x={x + barW * 0.35} y={height - 8} fill="#8b949e" fontSize={10} textAnchor="middle">
+              <text
+                x={x + barW * 0.35}
+                y={height - 8}
+                className="chart-label"
+                fontSize={10}
+                textAnchor="middle"
+              >
                 {idx}
               </text>
             </g>
           );
         })}
-        <text x={pad.left} y={14} fill="#8b949e" fontSize={11}>
+        <text x={pad.left} y={14} className="chart-label" fontSize={11}>
           Findings per iteration
         </text>
       </svg>
@@ -82,14 +88,20 @@ export default function MetricChart({ command, iterations }: Props) {
           const y = pad.top + innerH - h;
           return (
             <g key={r}>
-              <rect x={x} y={y} width={barW * 0.7} height={h} fill="#58a6ff" rx={2} />
-              <text x={x + barW * 0.35} y={height - 8} fill="#8b949e" fontSize={10} textAnchor="middle">
+              <rect x={x} y={y} width={barW * 0.7} height={h} className="chart-accent" rx={2} />
+              <text
+                x={x + barW * 0.35}
+                y={height - 8}
+                className="chart-label"
+                fontSize={10}
+                textAnchor="middle"
+              >
                 R{r}
               </text>
             </g>
           );
         })}
-        <text x={pad.left} y={14} fill="#8b949e" fontSize={11}>
+        <text x={pad.left} y={14} className="chart-label" fontSize={11}>
           Activity by round
         </text>
       </svg>
@@ -116,17 +128,23 @@ export default function MetricChart({ command, iterations }: Props) {
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="chart-svg">
-      <path d={linePath} fill="none" stroke="#58a6ff" strokeWidth={2} />
+      <path d={linePath} fill="none" className="chart-line" strokeWidth={2} />
       {coords.map((c) => (
         <circle
           key={`${c.p.index}-${c.p.status}`}
           cx={c.x}
           cy={c.y}
           r={4}
-          fill={c.p.outcome === "success" ? "#3fb950" : c.p.outcome === "failure" ? "#f85149" : "#8b949e"}
+          className={
+            c.p.outcome === "success"
+              ? "chart-success"
+              : c.p.outcome === "failure"
+                ? "chart-error"
+                : "chart-muted"
+          }
         />
       ))}
-      <text x={pad.left} y={14} fill="#8b949e" fontSize={11}>
+      <text x={pad.left} y={14} className="chart-label" fontSize={11}>
         {points[0]?.primaryLabel ?? "metric"} over iterations
       </text>
     </svg>
