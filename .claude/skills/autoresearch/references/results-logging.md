@@ -22,6 +22,68 @@ COMMIT=$(git rev-parse --short HEAD)
 echo -e "0\t${COMMIT}\t${BASELINE}\t0.0\tpass\tbaseline\tinitial state — coverage ${BASELINE}%" >> autoresearch-results.tsv
 ```
 
+### Optional: session metadata for the dashboard
+
+At loop start (Phase 0), you may write `.autoresearch/session.json` so the [monitoring dashboard](../../../dashboard/README.md) can show run configuration without parsing chat:
+
+```bash
+mkdir -p .autoresearch
+cat > .autoresearch/session.json <<'EOF'
+{
+  "goal": "Increase test coverage from 72% to 90%",
+  "scope": "src/**/*.ts",
+  "metric": "coverage %",
+  "verify": "npx jest --coverage 2>&1 | grep 'All files' | awk '{print $4}'",
+  "command": "autoresearch",
+  "startedAt": "2026-05-21T14:00:00Z"
+}
+EOF
+```
+
+This file is local metadata (add `.autoresearch/` to `.gitignore` if desired). The dashboard reads it read-only.
+
+### Optional: agent trace for the dashboard
+
+Append structured events to `.autoresearch/trace.jsonl` (NDJSON, one object per line) so the dashboard can show a live agent trace alongside iteration metrics:
+
+```bash
+mkdir -p .autoresearch
+
+# At loop start
+echo '{"ts":"2026-05-21T14:00:00Z","iteration":0,"phase":"setup","message":"Baseline recorded","level":"info"}' >> .autoresearch/trace.jsonl
+
+# During each phase (review, modify, verify, decide, log, etc.)
+log_trace() {
+  local iteration=$1 phase=$2 message=$3 level=${4:-info} detail=${5:-}
+  local ts
+  ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  if [ -n "$detail" ]; then
+    printf '{"ts":"%s","iteration":%s,"phase":"%s","message":"%s","detail":"%s","level":"%s"}\n' \
+      "$ts" "$iteration" "$phase" "$message" "$detail" "$level" >> .autoresearch/trace.jsonl
+  else
+    printf '{"ts":"%s","iteration":%s,"phase":"%s","message":"%s","level":"%s"}\n' \
+      "$ts" "$iteration" "$phase" "$message" "$level" >> .autoresearch/trace.jsonl
+  fi
+}
+
+log_trace 1 review "Read last 5 log entries — auth tests improved metric twice"
+log_trace 1 modify "Added boundary tests for auth token expiry" info "src/auth.test.ts"
+log_trace 1 verify "Verify returned 87.1 (+1.9)"
+log_trace 1 decide "keep — metric improved, guard passed" success
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `ts` | Yes | ISO 8601 timestamp |
+| `phase` | Yes | Loop phase: `setup`, `review`, `ideate`, `modify`, `commit`, `verify`, `guard`, `decide`, `log`, or `info` |
+| `message` | Yes | One-line summary of what the agent did or observed |
+| `iteration` | No | Iteration number (use `round` for predict/reason) |
+| `round` | No | Round number for swarm commands |
+| `detail` | No | File path, command output snippet, or extra context |
+| `level` | No | `info` (default), `success`, `failure`, or `warning` |
+
+Subcommands that write markdown trace files (`persona-debates.md`, `judge-transcripts.md`, `lineage.md`, etc.) are also surfaced automatically in the dashboard when their TSV log is selected.
+
 ## Logging Function
 
 Called at Phase 7 of every iteration after the keep/discard/crash decision:
