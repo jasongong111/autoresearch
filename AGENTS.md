@@ -67,6 +67,27 @@ cp -r autoresearch/plugins/autoresearch ~/.agents/plugins/autoresearch
 
 ---
 
+## Dashboard (real-time monitoring)
+
+Watch iteration logs and git experiments in a local web UI while any autoresearch command runs:
+
+```bash
+./dashboard/scripts/setup-env.sh
+conda activate autoresearch-dashboard
+cd dashboard/web && npm install && npm run build && cd ../..
+./bin/autoresearch-dashboard --project /path/to/target/repo
+```
+
+Open http://127.0.0.1:3847. See [dashboard/README.md](dashboard/README.md) for dev mode, API, and supported log formats.
+
+---
+
+## Sample project (test loop)
+
+A minimal agentic-skill router lives at [`samples/agentic-skill-demo/`](samples/agentic-skill-demo/). Run `./scripts/setup.sh` there, then `/autoresearch` with `Verify: ./scripts/verify-metric.sh` (see sample README).
+
+---
+
 ## Quick Start
 
 ### Basic autonomous loop
