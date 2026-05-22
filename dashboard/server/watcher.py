@@ -92,12 +92,24 @@ def start_transcript_watcher(state: DashboardState) -> Optional[Observer]:
     return observer
 
 
+def start_conversation_poll(state: DashboardState, interval: float = 2.0) -> threading.Thread:
+    """Poll transcript files for append-only updates (watchdog misses some on macOS)."""
+
+    def loop() -> None:
+        while True:
+            time.sleep(interval)
+            state.poll_conversations()
+
+    thread = threading.Thread(target=loop, daemon=True)
+    thread.start()
+    return thread
+
+
 def start_periodic_rescan(state: DashboardState, interval: float = 30.0) -> threading.Thread:
     def loop() -> None:
         while True:
             time.sleep(interval)
             state.refresh_runs()
-            state.on_conversation_changed()
             if state.refresh_git():
                 state.on_git_changed()
 
