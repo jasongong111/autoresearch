@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from pathlib import Path
+from typing import Optional
 
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
@@ -37,6 +38,9 @@ class LogFileHandler(FileSystemEventHandler):
                 return
             self.state.on_file_changed(rel)
             return
+        if rel.endswith("conversation.jsonl"):
+            self.state.on_conversation_changed()
+            return
         if Path(rel).name in RUN_TRACE_ARTIFACTS:
             run_dir = str(Path(rel).parent)
             self.state.refresh_runs()
@@ -61,11 +65,39 @@ def start_watcher(state: DashboardState) -> Observer:
     return observer
 
 
+def start_transcript_watcher(state: DashboardState) -> Optional[Observer]:
+    """Watch Cursor agent-transcript directories (outside project root)."""
+    if not state.transcript_dirs:
+        return None
+
+    class TranscriptHandler(FileSystemEventHandler):
+        def _notify(self, path: str) -> None:
+            if path.endswith(".jsonl"):
+                state.on_conversation_changed()
+
+        def on_modified(self, event: FileSystemEvent) -> None:
+            if not event.is_directory:
+                self._notify(event.src_path)
+
+        def on_created(self, event: FileSystemEvent) -> None:
+            if not event.is_directory:
+                self._notify(event.src_path)
+
+    transcript_handler = TranscriptHandler()
+    observer = Observer()
+    for tdir in state.transcript_dirs:
+        if tdir.is_dir():
+            observer.schedule(transcript_handler, str(tdir), recursive=True)
+    observer.start()
+    return observer
+
+
 def start_periodic_rescan(state: DashboardState, interval: float = 30.0) -> threading.Thread:
     def loop() -> None:
         while True:
             time.sleep(interval)
             state.refresh_runs()
+            state.on_conversation_changed()
             if state.refresh_git():
                 state.on_git_changed()
 
