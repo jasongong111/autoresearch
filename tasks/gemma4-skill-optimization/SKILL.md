@@ -44,6 +44,8 @@ The runtime executes **one** calculator round only.
 
 **Never call `calculator` twice.** After the tool result, finish any remaining step mentally and output digits only.
 
+Forbidden on turn 2: `tool_calls`, `<|channel>thought`, or any text besides the integer.
+
 ### Multi-step problems
 
 When the problem has two steps, use **one** tool call with the combined operands:
@@ -52,6 +54,16 @@ When the problem has two steps, use **one** tool call with the combined operands
 |---|---|---|
 | `(48+12)×3` | `multiply(60, 3)` — add 48+12 mentally first | `180` |
 | `100−25×2` | `multiply(25, 2)` → 50, then 100−50 mentally | `50` |
+
+#### Worked example: `100 − 25×2` (exact task pattern)
+
+User: *"Compute 100 minus the product of 25 and 2."*
+
+1. Tool call: `{"op":"multiply","a":25,"b":2}` → tool returns `50`
+2. Mental step: 100 − 50 = **50**
+3. Final message content: `50` — **do not** call `subtract(100,50)` on turn 2; the API will not execute a second tool round.
+
+If you already know both operands, you may instead call `subtract(100,50)` once on turn 1 and reply `50` on turn 2.
 
 ### Simple problems
 
