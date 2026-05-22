@@ -2,7 +2,11 @@
 
 from pathlib import Path
 
-from dashboard.server.trace import discover_run_artifacts, parse_trace_jsonl
+from dashboard.server.trace import (
+    discover_run_artifacts,
+    parse_trace_analytics,
+    parse_trace_jsonl,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -19,6 +23,48 @@ def test_parse_trace_jsonl():
 
 def test_parse_trace_jsonl_missing():
     assert parse_trace_jsonl(Path("/nonexistent/trace.jsonl")) == []
+
+
+def test_parse_trace_analytics():
+    analytics = parse_trace_analytics(FIXTURES / "analytics_trace.jsonl")
+
+    assert analytics["traces"]["total"] == 3
+    assert analytics["traces"]["byName"][0] == {"name": "research-loop", "count": 2}
+    assert analytics["modelCosts"]["totalCostUsd"] == 0.15
+    assert analytics["modelCosts"]["byModel"][0]["model"] == "claude-4.6"
+    assert analytics["modelCosts"]["byModel"][0]["tokens"] == 3000
+    assert analytics["modelCosts"]["byModel"][0]["costUsd"] == 0.12
+
+    quality = analytics["scores"]["summary"][0]
+    assert quality["name"] == "quality"
+    assert quality["source"] == "API"
+    assert quality["dataType"] == "NUMERIC"
+    assert quality["count"] == 2
+    assert quality["average"] == 0.5
+    assert quality["zeros"] == 1
+    assert quality["ones"] == 1
+
+    assert analytics["timeSeries"]["traceObservationByLevel"][0]["traceCount"] == 2
+    assert analytics["timeSeries"]["traceObservationByLevel"][0]["observationsByLevel"] == {
+        "DEBUG": 1,
+        "DEFAULT": 1,
+    }
+    assert analytics["userConsumption"]["costByUser"][0] == {
+        "user": "bob",
+        "totalCostUsd": 0.12,
+    }
+    assert analytics["userConsumption"]["traceCountByUser"][0] == {
+        "user": "alice",
+        "traceCount": 2,
+    }
+
+    assert analytics["latencies"]["trace"][0]["name"] == "research-loop"
+    assert analytics["latencies"]["generation"][0]["name"] == "execute"
+    assert analytics["modelLatencies"]["series"][0]["model"] == "claude-4.6"
+    assert analytics["scoreAnalytics"]["quality|API|NUMERIC"]["histogram"][0] == {
+        "bucket": "0",
+        "count": 1,
+    }
 
 
 def test_discover_run_artifacts(tmp_path: Path):
