@@ -641,6 +641,10 @@ td.mono,
   display: block;
 }
 
+.chart-svg.compact {
+  height: 160px;
+}
+
 .chart-svg .chart-label {
   fill: var(--muted-foreground);
 }
@@ -664,6 +668,116 @@ td.mono,
 .chart-svg .chart-line {
   stroke: var(--primary-accent);
   fill: none;
+}
+
+/* ——— Analytics ——— */
+.analytics-panel .panel {
+  margin-bottom: 0;
+}
+
+.analytics-grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.analytics-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stacked {
+  display: grid;
+  gap: 16px;
+}
+
+.subhead {
+  margin-bottom: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bar-list {
+  display: grid;
+  gap: 8px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 160px) 1fr minmax(48px, max-content);
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+}
+
+.bar-label {
+  overflow: hidden;
+  color: var(--foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--muted);
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary-accent);
+}
+
+.bar-value {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.usage-header {
+  gap: 12px;
+}
+
+.usage-header .select {
+  max-width: 240px;
+}
+
+.mini-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.mini-tab {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.mini-tab:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.mini-tab.active {
+  border-color: color-mix(in srgb, var(--primary-accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--primary-accent) 10%, transparent);
+  color: var(--primary-accent);
 }
 
 /* ——— Git list ——— */
@@ -1061,5 +1175,14 @@ td.mono,
   .select {
     min-width: 140px;
     max-width: 100%;
+  }
+
+  .analytics-grid.two,
+  .analytics-grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .bar-row {
+    grid-template-columns: minmax(72px, 120px) 1fr minmax(40px, max-content);
   }
 }
