@@ -13,12 +13,18 @@ from .discovery import active_run_id, discover_runs
 from .git_ops import ExperimentCommit, commit_diff_stat, list_experiment_commits
 from .parsers import compute_summary, parse_log_file
 from .schemas import RunInfo
+from .conversations import (
+    discover_conversations,
+    get_conversation_turns,
+    resolve_transcript_dirs,
+)
 from .trace import discover_run_artifacts, parse_trace_jsonl, trace_file_path
 
 
 class DashboardState:
-    def __init__(self, project_root: Path) -> None:
+    def __init__(self, project_root: Path, transcript_dirs: Optional[List[Path]] = None) -> None:
         self.project_root = project_root.resolve()
+        self.transcript_dirs = resolve_transcript_dirs(self.project_root, transcript_dirs)
         self.runs: List[RunInfo] = []
         self.iterations_cache: Dict[str, List[dict]] = {}
         self.summary_cache: Dict[str, dict] = {}
@@ -31,6 +37,9 @@ class DashboardState:
         self._trace_events: List[dict] = []
         self._trace_mtime: float = 0.0
         self._artifacts_cache: Dict[str, List[dict]] = {}
+        self._conversations: List[dict] = []
+        self._conversation_turns_cache: Dict[str, List[dict]] = {}
+        self._conversations_mtime: float = 0.0
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
@@ -42,6 +51,7 @@ class DashboardState:
             self.active_run_id = active_run_id(self.runs)
             self._load_session()
             self._load_trace(force=True)
+            self._load_conversations(force=True)
 
     def _load_session(self) -> None:
         session_path = self.project_root / ".autoresearch" / "session.json"
@@ -90,6 +100,62 @@ class DashboardState:
     def invalidate_artifacts(self, run_id: str) -> None:
         with self._lock:
             self._artifacts_cache.pop(run_id, None)
+
+    def _conversation_fingerprint(self) -> float:
+        latest = 0.0
+        local = self.project_root / ".autoresearch" / "conversation.jsonl"
+        if local.is_file():
+            latest = max(latest, local.stat().st_mtime)
+        for tdir in self.transcript_dirs:
+            if not tdir.is_dir():
+                continue
+            for path in tdir.rglob("*.jsonl"):
+                try:
+                    latest = max(latest, path.stat().st_mtime)
+                except OSError:
+                    continue
+        return latest
+
+    def _load_conversations(self, force: bool = False) -> bool:
+        fp = self._conversation_fingerprint()
+        if not force and fp == self._conversations_mtime:
+            return False
+        conversations = discover_conversations(self.project_root, self.transcript_dirs)
+        self._conversations = [c.to_dict() for c in conversations]
+        self._conversations_mtime = fp
+        self._conversation_turns_cache.clear()
+        return True
+
+    def get_conversations(self) -> List[dict]:
+        with self._lock:
+            self._load_conversations()
+            return list(self._conversations)
+
+    def get_conversation(self, conversation_id: str) -> Optional[dict]:
+        conversations = self.get_conversations()
+        for conv in conversations:
+            if conv["id"] == conversation_id:
+                return conv
+        return None
+
+    def get_conversation_turns(self, conversation_id: str) -> List[dict]:
+        with self._lock:
+            if conversation_id in self._conversation_turns_cache:
+                return self._conversation_turns_cache[conversation_id]
+        conv = self.get_conversation(conversation_id)
+        if not conv:
+            return []
+        turns = get_conversation_turns(Path(conv["path"]))
+        with self._lock:
+            self._conversation_turns_cache[conversation_id] = turns
+        return turns
+
+    def on_conversation_changed(self) -> None:
+        changed = False
+        with self._lock:
+            changed = self._load_conversations(force=True)
+        if changed:
+            self._schedule_publish({"type": "conversation_updated"})
 
     def invalidate_run(self, run_id: str) -> None:
         with self._lock:
