@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from dashboard.server.conversations import (
+    conversation_sources_fingerprint,
     discover_conversations,
     normalize_content_block,
     parse_transcript_jsonl,
@@ -76,3 +77,22 @@ def test_resolve_transcript_dirs_explicit(tmp_path: Path):
     explicit.mkdir()
     dirs = resolve_transcript_dirs(tmp_path, [explicit])
     assert explicit.resolve() in dirs
+
+
+def test_conversation_fingerprint_detects_append(tmp_path: Path):
+    conv_dir = tmp_path / ".autoresearch"
+    conv_dir.mkdir()
+    path = conv_dir / "conversation.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "role": "user",
+                "message": {"content": [{"type": "text", "text": "Hello"}]},
+            }
+        )
+        + "\n"
+    )
+    fp1 = conversation_sources_fingerprint(tmp_path, [])
+    path.write_text(path.read_text() + json.dumps({"role": "user", "message": {"content": [{"type": "text", "text": "More"}]}}) + "\n")
+    fp2 = conversation_sources_fingerprint(tmp_path, [])
+    assert fp1 != fp2
