@@ -38,6 +38,7 @@ import type {
   ConversationTurn,
   GitCommit,
   Iteration,
+  Project,
   Run,
   Session,
   Summary,
@@ -99,6 +100,8 @@ function shortPath(path: string): string {
 
 export default function App() {
   const [project, setProject] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [runs, setRuns] = useState<Run[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [iterations, setIterations] = useState<Iteration[]>([]);
@@ -111,6 +114,8 @@ export default function App() {
   const [conversations, setConversations] = useState<ConversationInfo[]>([]);
   const [conversationTurns, setConversationTurns] = useState<ConversationTurn[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [followLiveConversation, setFollowLiveConversation] = useState(true);
+  const [conversationUpdating, setConversationUpdating] = useState(false);
   const [transcriptDirs, setTranscriptDirs] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -135,21 +140,29 @@ export default function App() {
     }
   }, []);
 
-  const loadConversations = useCallback(async (preferredId?: string | null) => {
-    const { conversations: convs, transcriptDirs: dirs } = await fetchConversations();
-    setConversations(convs);
-    setTranscriptDirs(dirs);
-    const id =
-      preferredId && convs.some((c) => c.id === preferredId)
-        ? preferredId
-        : convs[0]?.id ?? null;
-    setSelectedConversationId(id);
-    if (id) {
-      await loadConversation(id);
-    } else {
-      setConversationTurns([]);
-    }
-  }, [loadConversation]);
+  const loadConversations = useCallback(
+    async (options?: { preferredId?: string | null; followLatest?: boolean }) => {
+      const preferredId = options?.preferredId;
+      const followLatest = options?.followLatest ?? false;
+      const { conversations: convs, transcriptDirs: dirs } = await fetchConversations();
+      setConversations(convs);
+      setTranscriptDirs(dirs);
+      let id =
+        preferredId && convs.some((c) => c.id === preferredId)
+          ? preferredId
+          : convs[0]?.id ?? null;
+      if ((followLatest || followLiveConversation) && convs.length > 0) {
+        id = convs[0].id;
+      }
+      setSelectedConversationId(id);
+      if (id) {
+        await loadConversation(id);
+      } else {
+        setConversationTurns([]);
+      }
+    },
+    [loadConversation, followLiveConversation]
+  );
 
   const loadRunData = useCallback(async (runId: string) => {
     const [iters, sum, runDetail, trace, analyticsData, arts] = await Promise.all([
@@ -177,21 +190,35 @@ export default function App() {
         fetchGitCommits(),
       ]);
       setProject(health.project);
+      setProjects(runsData.projects ?? []);
       setRuns(runsData.runs);
       setCommits(gitData);
-      await loadConversations(selectedConversationId);
+      await loadConversations({ preferredId: selectedConversationId });
+      const projectRuns =
+        selectedProjectId === "all"
+          ? runsData.runs
+          : runsData.runs.filter((r) => r.projectId === selectedProjectId);
       const active = runsData.activeRunId ?? runsData.runs[0]?.runId ?? null;
-      const runId = selectedRunId && runsData.runs.some((r) => r.runId === selectedRunId)
-        ? selectedRunId
-        : active;
+      const runId =
+        selectedRunId && projectRuns.some((r) => r.runId === selectedRunId)
+          ? selectedRunId
+          : projectRuns[0]?.runId ?? (selectedProjectId === "all" ? active : null);
       if (runId) {
         setSelectedRunId(runId);
         await loadRunData(runId);
+      } else {
+        setSelectedRunId(null);
+        setIterations([]);
+        setSummary(null);
+        setSession(null);
+        setTraceEvents([]);
+        setAnalytics(null);
+        setArtifacts([]);
       }
     } finally {
       setLoading(false);
     }
-  }, [selectedRunId, selectedConversationId, loadRunData, loadConversations]);
+  }, [selectedRunId, selectedProjectId, selectedConversationId, loadRunData, loadConversations]);
 
   useEffect(() => {
     refresh();
@@ -212,7 +239,10 @@ export default function App() {
         if (event.runId === selectedRunId) {
           loadRunData(event.runId);
         }
-        fetchRuns().then((d) => setRuns(d.runs));
+        fetchRuns().then((d) => {
+          setProjects(d.projects ?? []);
+          setRuns(d.runs);
+        });
       }
       if (event.type === "git_updated") {
         fetchGitCommits().then(setCommits);
@@ -227,16 +257,39 @@ export default function App() {
         }
       }
       if (event.type === "conversation_updated") {
-        loadConversations(selectedConversationId);
+        setConversationUpdating(true);
+        void loadConversations({
+          preferredId: followLiveConversation ? event.conversationId : selectedConversationId,
+          followLatest: followLiveConversation,
+        }).finally(() => setConversationUpdating(false));
       }
     });
     setConnected(true);
     return unsub;
-  }, [selectedRunId, loadRunData, loadConversations, selectedConversationId]);
+  }, [selectedRunId, loadRunData, loadConversations, selectedConversationId, followLiveConversation]);
 
   const handleConversationChange = async (conversationId: string) => {
+    setFollowLiveConversation(false);
     setSelectedConversationId(conversationId);
     await loadConversation(conversationId);
+  };
+
+  const handleProjectChange = async (projectId: string) => {
+    setSelectedProjectId(projectId);
+    const projectRuns =
+      projectId === "all" ? runs : runs.filter((r) => r.projectId === projectId);
+    const runId = projectRuns[0]?.runId ?? null;
+    setSelectedRunId(runId);
+    if (runId) {
+      await loadRunData(runId);
+    } else {
+      setIterations([]);
+      setSummary(null);
+      setSession(null);
+      setTraceEvents([]);
+      setAnalytics(null);
+      setArtifacts([]);
+    }
   };
 
   const handleRunChange = async (runId: string) => {
@@ -245,7 +298,12 @@ export default function App() {
   };
 
   const selectedRun = runs.find((r) => r.runId === selectedRunId);
-  const groupedRuns = runs.reduce<Record<string, Run[]>>((acc, r) => {
+  const visibleRuns =
+    selectedProjectId === "all"
+      ? runs
+      : runs.filter((r) => r.projectId === selectedProjectId);
+  const selectedProject = projects.find((p) => p.projectId === selectedProjectId) ?? null;
+  const groupedRuns = visibleRuns.reduce<Record<string, Run[]>>((acc, r) => {
     (acc[r.command] ??= []).push(r);
     return acc;
   }, {});
@@ -262,9 +320,22 @@ export default function App() {
     }
 
     if (!selectedRun) {
+      const projectLabel =
+        selectedProjectId === "all"
+          ? "the watched workspace"
+          : selectedProject?.projectId ?? selectedProjectId;
       return (
         <p className="empty">
-          No autoresearch runs detected. Start <code>/autoresearch</code> in the watched project.
+          {visibleRuns.length === 0 && projects.some((p) => p.isTask) ? (
+            <>
+              No runs in <code>{projectLabel}</code> yet. Start <code>/autoresearch</code> in that
+              task directory.
+            </>
+          ) : (
+            <>
+              No autoresearch runs detected. Start <code>/autoresearch</code> in the watched project.
+            </>
+          )}
         </p>
       );
     }
@@ -362,6 +433,9 @@ export default function App() {
                 selectedId={selectedConversationId}
                 onSelect={handleConversationChange}
                 transcriptDirs={transcriptDirs}
+                followLive={followLiveConversation}
+                onFollowLiveChange={setFollowLiveConversation}
+                liveUpdating={conversationUpdating}
               />
             </div>
           </div>
@@ -480,11 +554,26 @@ export default function App() {
               {selectedRun ? selectedRun.runId : "Dashboard"}
             </h1>
             <div className="page-header-spacer" />
+            {projects.length > 1 && (
+              <select
+                className="select"
+                value={selectedProjectId}
+                onChange={(e) => handleProjectChange(e.target.value)}
+                title="Filter by project"
+              >
+                <option value="all">All projects ({runs.length} runs)</option>
+                {projects.map((p) => (
+                  <option key={p.projectId} value={p.projectId}>
+                    {p.projectId === "." ? p.name : p.projectId} ({p.runCount} run{p.runCount === 1 ? "" : "s"})
+                  </option>
+                ))}
+              </select>
+            )}
             <select
               className="select"
               value={selectedRunId ?? ""}
               onChange={(e) => handleRunChange(e.target.value)}
-              disabled={runs.length === 0}
+              disabled={visibleRuns.length === 0}
             >
               {Object.entries(groupedRuns).map(([cmd, cmdRuns]) => (
                 <optgroup key={cmd} label={cmd}>
