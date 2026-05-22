@@ -100,8 +100,8 @@ def normalize_row(
     cmd = command.value
 
     if command == Command.AUTORESEARCH:
-        status = row.get("status", "")
-        metric = _parse_float(row.get("metric", ""))
+        status = row.get("status", "") or row.get("action", "")
+        metric = _parse_float(row.get("metric", "") or row.get("score", ""))
         return NormalizedIteration(
             run_id=run_id,
             command=cmd,
@@ -110,7 +110,7 @@ def normalize_row(
             primary_value=metric,
             primary_label="metric",
             outcome=derive_outcome(status),
-            description=row.get("description", ""),
+            description=row.get("description", "") or row.get("details", ""),
             location="",
             commit=row.get("commit", "") if row.get("commit", "") != "-" else "",
             raw=dict(row),
