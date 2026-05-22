@@ -84,6 +84,25 @@ log_trace 1 decide "keep — metric improved, guard passed" success
 
 Subcommands that write markdown trace files (`persona-debates.md`, `judge-transcripts.md`, `lineage.md`, etc.) are also surfaced automatically in the dashboard when their TSV log is selected.
 
+### Optional: trace analytics events
+
+The dashboard also accepts richer Langfuse-like events in the same `.autoresearch/trace.jsonl` file. These events are optional and can be mixed with the simple loop events above. Use `type` (or `eventType`) to identify the record:
+
+```json
+{"ts":"2026-05-21T14:00:00Z","type":"trace","id":"t1","name":"research-loop","userId":"alice","latencyMs":1200}
+{"ts":"2026-05-21T14:01:00Z","type":"observation","id":"o1","traceId":"t1","name":"plan","observationType":"generation","level":"DEFAULT","model":"gpt-5.5","userId":"alice","usage":{"input":1000,"output":500,"total":1500},"cost":{"input":0.01,"output":0.02,"total":0.03},"latencyMs":800}
+{"ts":"2026-05-21T14:02:00Z","type":"score","traceId":"t1","name":"quality","source":"API","dataType":"NUMERIC","value":1}
+```
+
+| Event type | Key fields | Enables |
+|------------|------------|---------|
+| `trace` | `id`, `name`, `userId`, `latencyMs` or `startTime`/`endTime` | Trace count, trace count by name/user, trace latency percentiles |
+| `observation` | `id`, `traceId`, `name`, `observationType`, `level`, `latencyMs` | Observation count by level, observation latency percentiles |
+| `observation` with `observationType: "generation"` | `model`, `usage`, `cost`, `userId`, `latencyMs` | Model costs, model usage, user token cost, generation latency, model latency time series |
+| `score` | `name`, `source`, `dataType`, `value` | Score summary, moving averages, histograms, categorical breakdowns |
+
+Supported aliases: `eventType` for `type`, `modelName` for `model`, `latency_ms`/`durationMs`/`duration_ms` for `latencyMs`. Timestamps are bucketed hourly for time-series charts. `usage` and `cost` should be objects with optional `input`, `output`, and `total` values; if `total` is missing, the dashboard sums the provided detail fields.
+
 ### Agent conversations in the dashboard
 
 The dashboard reads full agent conversations (user messages, assistant text, thinking, tool calls, MCP calls, tool results) from:
