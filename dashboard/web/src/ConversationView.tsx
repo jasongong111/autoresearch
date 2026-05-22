@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContentBlock, ConversationInfo, ConversationTurn } from "./types";
 
 interface Props {
@@ -7,6 +7,9 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   transcriptDirs: string[];
+  followLive: boolean;
+  onFollowLiveChange: (value: boolean) => void;
+  liveUpdating: boolean;
 }
 
 type BlockFilter = "all" | "hide_thinking" | "tools_only";
@@ -85,8 +88,27 @@ export default function ConversationView({
   selectedId,
   onSelect,
   transcriptDirs,
+  followLive,
+  onFollowLiveChange,
+  liveUpdating,
 }: Props) {
   const [blockFilter, setBlockFilter] = useState<BlockFilter>("all");
+  const threadRef = useRef<HTMLDivElement>(null);
+  const prevTurnCountRef = useRef(0);
+
+  useEffect(() => {
+    if (turns.length <= prevTurnCountRef.current) {
+      prevTurnCountRef.current = turns.length;
+      return;
+    }
+    prevTurnCountRef.current = turns.length;
+    const el = threadRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (followLive || nearBottom) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [turns, followLive]);
 
   const stats = useMemo(() => {
     let tools = 0;
@@ -137,6 +159,15 @@ export default function ConversationView({
           <option value="hide_thinking">Hide thinking</option>
           <option value="tools_only">Tools & MCP only</option>
         </select>
+        <label className="conv-live-toggle">
+          <input
+            type="checkbox"
+            checked={followLive}
+            onChange={(e) => onFollowLiveChange(e.target.checked)}
+          />
+          Follow live
+          {liveUpdating && <span className="conv-live-dot" aria-hidden />}
+        </label>
         <span className="conv-stats">
           {stats.turns} turns · {stats.tools} tools · {stats.mcp} MCP · {stats.thinking} thinking
         </span>
@@ -148,7 +179,7 @@ export default function ConversationView({
         </div>
       )}
 
-      <div className="conv-thread">
+      <div className="conv-thread" ref={threadRef}>
         {turns.map((turn) => {
           const blocks = filterBlocks(turn.blocks, blockFilter);
           if (blocks.length === 0) return null;
