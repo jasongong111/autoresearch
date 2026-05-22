@@ -74,6 +74,7 @@ Open **http://127.0.0.1:5174**.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--project PATH` | current directory | Target repo where the agent writes TSV logs |
+| `--transcripts-dir PATH` | auto-detect Cursor | Agent conversation JSONL directory (repeatable) |
 | `--port` | `3847` | HTTP port |
 | `--host` | `127.0.0.1` | Bind address |
 | `--static PATH` | `dashboard/web/dist` | Built React assets |
@@ -107,8 +108,10 @@ If the agent writes `.autoresearch/session.json` at loop start, the dashboard sh
 | `GET /api/runs/{id}/summary` | Aggregates (keeps, discards, stuck warning) |
 | `GET /api/git/commits` | Recent `experiment:` commits |
 | `GET /api/trace` | Live agent trace events from `.autoresearch/trace.jsonl` |
+| `GET /api/conversations` | Agent conversation sessions (Cursor transcripts + local JSONL) |
+| `GET /api/conversations/{id}/turns` | Full conversation turns with text, thinking, tools, MCP |
 | `GET /api/runs/{id}/artifacts` | Trace markdown/JSONL files in the run directory |
-| `GET /api/events` | SSE stream (`run_updated`, `git_updated`, `trace_updated`) |
+| `GET /api/events` | SSE stream (`run_updated`, `git_updated`, `trace_updated`, `conversation_updated`) |
 
 ## Tests
 
