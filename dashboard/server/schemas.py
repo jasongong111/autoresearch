@@ -240,6 +240,24 @@ class NormalizedIteration:
 
 
 @dataclass
+class ProjectInfo:
+    project_id: str
+    project_path: str
+    name: str
+    run_count: int = 0
+    is_task: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "projectId": self.project_id,
+            "projectPath": self.project_path,
+            "name": self.name,
+            "runCount": self.run_count,
+            "isTask": self.is_task,
+        }
+
+
+@dataclass
 class RunInfo:
     run_id: str
     command: str
