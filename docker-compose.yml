@@ -1,0 +1,37 @@
+# Autoresearch web app — Docker Compose for local runs and cloud-style deployment.
+#
+# From repo root:
+#   docker compose up --build
+#
+# Open http://127.0.0.1:3847
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: autoresearch-backend:latest
+    ports:
+      - "${DASHBOARD_PORT:-3847}:3847"
+    environment:
+      DASHBOARD_HOST: 0.0.0.0
+      DASHBOARD_PORT: "3847"
+      DASHBOARD_PROJECT: /workspace
+      DASHBOARD_TRANSCRIPTS_DIR: /transcripts
+    volumes:
+      - ${DASHBOARD_WORKSPACE:-.}:/workspace:ro
+      - ${CURSOR_TRANSCRIPTS_DIR:-${HOME}/.cursor/projects/Users-jasongong-Desktop-autoresearch/agent-transcripts}:/transcripts:ro
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: autoresearch-frontend:latest
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    environment:
+      - BACKEND_URL=http://backend:3847
+    depends_on:
+      - backend
+    restart: unless-stopped
