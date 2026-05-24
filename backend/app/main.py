@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI
@@ -39,7 +42,18 @@ def create_app(
     run_manager: RunManager,
     static_dir: Path | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Autoresearch", version="2.1.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        loop = asyncio.get_running_loop()
+        state.set_event_loop(loop)
+        event_bus.set_event_loop(loop)
+        state.refresh_runs()
+        state.refresh_git(force=True)
+        run_manager.start_polling()
+        yield
+        run_manager.stop_polling()
+
+    app = FastAPI(title="Autoresearch", version="2.1.0", lifespan=lifespan)
     app.state.dashboard = state
     app.state.event_bus = event_bus
     app.state.run_manager = run_manager
@@ -51,21 +65,6 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    @app.on_event("startup")
-    async def startup() -> None:
-        import asyncio
-
-        loop = asyncio.get_running_loop()
-        state.set_event_loop(loop)
-        event_bus.set_event_loop(loop)
-        state.refresh_runs()
-        state.refresh_git(force=True)
-        run_manager.start_polling()
-
-    @app.on_event("shutdown")
-    async def shutdown() -> None:
-        run_manager.stop_polling()
 
     app.include_router(make_health_router(state))
     app.include_router(make_projects_router(state))

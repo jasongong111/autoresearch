@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator, Optional
 
@@ -16,7 +17,16 @@ from backend.app.core.state import DashboardState
 
 
 def create_app(state: DashboardState, static_dir: Optional[Path] = None) -> FastAPI:
-    app = FastAPI(title="Autoresearch Dashboard", version="1.0.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        loop = asyncio.get_running_loop()
+        app.state.loop = loop
+        state.set_event_loop(loop)
+        state.refresh_runs()
+        state.refresh_git(force=True)
+        yield
+
+    app = FastAPI(title="Autoresearch Dashboard", version="1.0.0", lifespan=lifespan)
     app.state.dashboard = state
     app.state.loop: Optional[asyncio.AbstractEventLoop] = None
 
@@ -27,13 +37,6 @@ def create_app(state: DashboardState, static_dir: Optional[Path] = None) -> Fast
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    @app.on_event("startup")
-    async def startup() -> None:
-        app.state.loop = asyncio.get_running_loop()
-        state.set_event_loop(app.state.loop)
-        state.refresh_runs()
-        state.refresh_git(force=True)
 
     @app.get("/api/health")
     def health() -> dict:
