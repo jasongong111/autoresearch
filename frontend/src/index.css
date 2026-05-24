@@ -176,6 +176,10 @@ body {
   transition: background-color 0.15s, color 0.15s;
 }
 
+.nav-item {
+  text-decoration: none;
+}
+
 .nav-item:hover {
   background: color-mix(in srgb, var(--muted) 50%, transparent);
   color: var(--foreground);
@@ -374,9 +378,37 @@ body {
   background: color-mix(in srgb, var(--muted) 50%, transparent);
 }
 
+.btn-accent {
+  background: var(--primary-accent);
+  color: var(--primary-foreground);
+  border: 1px solid var(--primary-accent);
+}
+
+.btn-accent:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
 .btn-icon {
   width: var(--control-height);
   padding: 0;
+}
+
+.input-default,
+textarea.input-default {
+  height: var(--control-height);
+  padding: 4px 8px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.825rem;
+  box-sizing: border-box;
+}
+
+textarea.input-default {
+  height: auto;
+  resize: vertical;
 }
 
 .select {
@@ -952,6 +984,34 @@ td.mono,
   font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--muted-foreground);
+}
+
+.trace-payload {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+.trace-payload summary {
+  cursor: pointer;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--primary-accent);
+}
+
+.trace-payload pre {
+  margin: 0;
+  padding: 8px;
+  max-height: 260px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .trace-doc {

@@ -5,6 +5,8 @@ import type {
   Iteration,
   Project,
   Run,
+  RunConfig,
+  RunInstance,
   Session,
   Summary,
   TraceAnalytics,
@@ -82,6 +84,20 @@ export async function fetchRunTrace(runId: string): Promise<TraceEvent[]> {
   return data.events ?? [];
 }
 
+export async function fetchRunGemma4Trace(runId: string): Promise<TraceEvent[]> {
+  const r = await fetch(`${API}/runs/${encodeURI(runId)}/gemma4-trace`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.events ?? [];
+}
+
+export async function fetchRunGemma3Trace(runId: string): Promise<TraceEvent[]> {
+  const r = await fetch(`${API}/runs/${encodeURI(runId)}/gemma3-trace`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.events ?? [];
+}
+
 export async function fetchRunAnalytics(runId: string): Promise<TraceAnalytics | null> {
   const r = await fetch(`${API}/runs/${encodeURI(runId)}/analytics`);
   if (!r.ok) return null;
@@ -116,12 +132,100 @@ export async function fetchConversationTurns(
   return r.json();
 }
 
+export async function fetchConfigs(): Promise<RunConfig[]> {
+  const r = await fetch(`${API}/orchestrator/configs`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.configs ?? [];
+}
+
+export async function fetchConfig(configId: string): Promise<RunConfig | null> {
+  const r = await fetch(`${API}/orchestrator/configs/${encodeURIComponent(configId)}`);
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function createConfig(config: Partial<RunConfig>): Promise<RunConfig> {
+  const r = await fetch(`${API}/orchestrator/configs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+  if (!r.ok) throw new Error("Failed to create config");
+  return r.json();
+}
+
+export async function updateConfig(configId: string, config: Partial<RunConfig>): Promise<RunConfig> {
+  const r = await fetch(`${API}/orchestrator/configs/${encodeURIComponent(configId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+  if (!r.ok) throw new Error("Failed to update config");
+  return r.json();
+}
+
+export async function deleteConfig(configId: string): Promise<void> {
+  const r = await fetch(`${API}/orchestrator/configs/${encodeURIComponent(configId)}`, {
+    method: "DELETE",
+  });
+  if (!r.ok) throw new Error("Failed to delete config");
+}
+
+export async function startRun(configId: string): Promise<RunInstance> {
+  const r = await fetch(`${API}/orchestrator/configs/${encodeURIComponent(configId)}/start`, {
+    method: "POST",
+  });
+  if (!r.ok) throw new Error("Failed to start run");
+  return r.json();
+}
+
+export async function stopRun(instanceId: string): Promise<void> {
+  const r = await fetch(`${API}/orchestrator/instances/${encodeURIComponent(instanceId)}/stop`, {
+    method: "POST",
+  });
+  if (!r.ok) throw new Error("Failed to stop run");
+}
+
+export async function fetchInstances(): Promise<RunInstance[]> {
+  const r = await fetch(`${API}/orchestrator/instances`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.instances ?? [];
+}
+
+export async function fetchInstance(instanceId: string): Promise<RunInstance | null> {
+  const r = await fetch(`${API}/orchestrator/instances/${encodeURIComponent(instanceId)}`);
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function fetchInstanceLogs(instanceId: string): Promise<{ stdout: string[]; stderr: string[] }> {
+  const r = await fetch(`${API}/orchestrator/instances/${encodeURIComponent(instanceId)}/logs`);
+  if (!r.ok) return { stdout: [], stderr: [] };
+  return r.json();
+}
+
+export async function validateConfig(data: Partial<RunConfig>): Promise<{ valid: boolean; error?: string; numbers?: string[]; output?: string; exitCode?: number }> {
+  const r = await fetch(`${API}/orchestrator/configs/validate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) return { valid: false, error: "Validation request failed" };
+  return r.json();
+}
+
 export function subscribeEvents(
   onEvent: (event: {
     type: string;
     runId?: string;
     iterationCount?: number;
     conversationId?: string;
+    instanceId?: string;
+    status?: string;
+    stream?: string;
+    line?: string;
   }) => void
 ): () => void {
   const es = new EventSource(`${API}/events`);

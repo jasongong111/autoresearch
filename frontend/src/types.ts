@@ -67,6 +67,18 @@ export interface TraceEvent {
   round?: number;
   detail?: string;
   level: string;
+  request?: unknown;
+  response?: unknown;
+  error?: unknown;
+  raw?: unknown;
+  [key: string]: unknown;
+}
+
+export interface TraceStream {
+  id: string;
+  title: string;
+  path: string;
+  events: TraceEvent[];
 }
 
 export interface TraceArtifact {
@@ -181,4 +193,34 @@ export interface ConversationTurn {
   index: number;
   role: string;
   blocks: ContentBlock[];
+}
+
+export interface RunConfig {
+  id: string;
+  name: string;
+  command: string;
+  goal: string;
+  scope: string;
+  metric: string;
+  verify: string;
+  guard?: string;
+  direction?: string;
+  iterations?: number;
+  flags: Record<string, unknown>;
+  runner: string;
+  project_path: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RunInstance {
+  id: string;
+  config_id: string;
+  status: "queued" | "running" | "completed" | "failed" | "stopped";
+  pid?: number;
+  started_at?: string;
+  completed_at?: string;
+  exit_code?: number;
+  stdout_tail: string[];
+  stderr_tail: string[];
 }
