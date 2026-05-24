@@ -11,6 +11,20 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 TRACE_PATH = ".autoresearch/trace.jsonl"
+GEMMA3_TRACE_PATH = ".autoresearch/gemma3-trace.jsonl"
+GEMMA4_TRACE_PATH = ".autoresearch/gemma4-trace.jsonl"
+
+TRACE_EVENT_BASE_KEYS = {
+    "ts",
+    "timestamp",
+    "phase",
+    "message",
+    "msg",
+    "iteration",
+    "round",
+    "detail",
+    "level",
+}
 
 # Markdown / JSONL artifacts that carry agent reasoning traces per command folder.
 RUN_TRACE_ARTIFACTS: Dict[str, str] = {
@@ -38,6 +52,7 @@ class TraceEvent:
     round: Optional[int] = None
     detail: Optional[str] = None
     level: str = "info"
+    payload: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
@@ -52,6 +67,7 @@ class TraceEvent:
             out["round"] = self.round
         if self.detail:
             out["detail"] = self.detail
+        out.update(self.payload)
         return out
 
 
@@ -77,6 +93,14 @@ def trace_file_path(project_root: Path) -> Path:
     return project_root / TRACE_PATH
 
 
+def gemma3_trace_file_path(project_root: Path) -> Path:
+    return project_root / GEMMA3_TRACE_PATH
+
+
+def gemma4_trace_file_path(project_root: Path) -> Path:
+    return project_root / GEMMA4_TRACE_PATH
+
+
 def parse_trace_jsonl(path: Path) -> List[TraceEvent]:
     if not path.is_file():
         return []
@@ -88,6 +112,7 @@ def parse_trace_jsonl(path: Path) -> List[TraceEvent]:
             continue
         iteration = _optional_int(obj.get("iteration"))
         round_num = _optional_int(obj.get("round"))
+        payload = {key: value for key, value in obj.items() if key not in TRACE_EVENT_BASE_KEYS}
         events.append(
             TraceEvent(
                 ts=str(obj.get("ts") or obj.get("timestamp") or ""),
@@ -97,6 +122,7 @@ def parse_trace_jsonl(path: Path) -> List[TraceEvent]:
                 round=round_num,
                 detail=_optional_str(obj.get("detail")),
                 level=str(obj.get("level") or "info").lower(),
+                payload=payload,
             )
         )
     return events

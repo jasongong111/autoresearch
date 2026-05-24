@@ -1,14 +1,14 @@
-# Autoresearch dashboard — multi-stage image for local Docker and cloud deployment.
+# Autoresearch web app — multi-stage image for local Docker and cloud deployment.
 # Build from repo root:
-#   docker build -f dashboard/Dockerfile -t autoresearch-dashboard .
+#   docker build -f backend/Dockerfile -t autoresearch-dashboard .
 # Run:
 #   docker run --rm -p 3847:3847 -v "$(pwd):/workspace:ro" autoresearch-dashboard
 
 FROM node:20-alpine AS web
 WORKDIR /build
-COPY dashboard/web/package.json dashboard/web/package-lock.json ./
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
-COPY dashboard/web/ ./
+COPY frontend/ ./
 RUN npm run build
 
 FROM python:3.12-slim AS runtime
@@ -18,14 +18,13 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 
-COPY dashboard/requirements.txt ./dashboard/requirements.txt
-RUN pip install --no-cache-dir -r dashboard/requirements.txt
+COPY backend/requirements.txt ./backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
 
-COPY dashboard/server ./dashboard/server
-COPY dashboard/__init__.py ./dashboard/__init__.py
-COPY --from=web /build/dist ./dashboard/web/dist
+COPY backend/app ./backend/app
+COPY --from=web /build/dist ./frontend/dist
 
-COPY dashboard/docker-entrypoint.sh /entrypoint.sh
+COPY backend/docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENV PYTHONPATH=/app \

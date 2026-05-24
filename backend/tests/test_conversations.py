@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from dashboard.server.conversations import (
+from backend.app.core.conversations import (
     conversation_sources_fingerprint,
     discover_conversations,
     normalize_content_block,

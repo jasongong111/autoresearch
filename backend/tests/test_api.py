@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from dashboard.server.app import create_app
-from dashboard.server.state import DashboardState
+from backend.app.core.app import create_app
+from backend.app.core.state import DashboardState
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -96,6 +96,48 @@ def test_task_project_trace_api(client: TestClient, tmp_path: Path):
     assert trace["events"] == []
     analytics = client.get(f"/api/runs/{run_id}/analytics").json()
     assert analytics["traces"]["total"] == 3
+
+
+def test_task_project_gemma4_trace_api(client: TestClient, tmp_path: Path):
+    task_project = tmp_path / "tasks" / "gemma4-skill-optimization"
+    task_project.mkdir(parents=True)
+    (task_project / "autoresearch-results.tsv").write_text(
+        (FIXTURES / "autoresearch-results.tsv").read_text()
+    )
+    trace_dir = task_project / ".autoresearch"
+    trace_dir.mkdir()
+    (trace_dir / "trace.jsonl").write_text((FIXTURES / "trace.jsonl").read_text())
+    (trace_dir / "gemma4-trace.jsonl").write_text((FIXTURES / "gemma4_trace.jsonl").read_text())
+    state = client.app.state.dashboard  # type: ignore[attr-defined]
+    state.refresh_runs()
+
+    run_id = "tasks/gemma4-skill-optimization/autoresearch-results.tsv"
+    gemma4_trace = client.get(f"/api/runs/{run_id}/gemma4-trace").json()
+
+    assert len(gemma4_trace["events"]) == 3
+    assert gemma4_trace["events"][0]["phase"] == "prompt"
+    assert gemma4_trace["events"][2]["level"] == "success"
+
+
+def test_task_project_gemma3_trace_api_preserves_payloads(client: TestClient, tmp_path: Path):
+    task_project = tmp_path / "tasks" / "gemma3-skill-optimization"
+    task_project.mkdir(parents=True)
+    (task_project / "autoresearch-results.tsv").write_text(
+        (FIXTURES / "autoresearch-results.tsv").read_text()
+    )
+    trace_dir = task_project / ".autoresearch"
+    trace_dir.mkdir()
+    (trace_dir / "gemma3-trace.jsonl").write_text((FIXTURES / "gemma3_trace.jsonl").read_text())
+    state = client.app.state.dashboard  # type: ignore[attr-defined]
+    state.refresh_runs()
+
+    run_id = "tasks/gemma3-skill-optimization/autoresearch-results.tsv"
+    gemma3_trace = client.get(f"/api/runs/{run_id}/gemma3-trace").json()
+
+    assert len(gemma3_trace["events"]) == 2
+    assert gemma3_trace["events"][0]["phase"] == "api_request"
+    assert gemma3_trace["events"][0]["request"]["messages"][1]["content"] == "What is 40 + 2?"
+    assert gemma3_trace["events"][1]["response"]["choices"][0]["message"]["content"] == "42"
 
 
 def test_analytics_api(client: TestClient, tmp_path: Path):

@@ -10,8 +10,8 @@ from typing import Optional
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-from .state import DashboardState
-from .trace import RUN_TRACE_ARTIFACTS
+from backend.app.core.state import DashboardState
+from backend.app.core.trace import RUN_TRACE_ARTIFACTS
 
 
 class LogFileHandler(FileSystemEventHandler):
@@ -32,6 +32,12 @@ class LogFileHandler(FileSystemEventHandler):
         if rel.endswith(".tsv") or rel.endswith("session.json") or rel.endswith("trace.jsonl"):
             if rel.endswith("session.json"):
                 self.state.refresh_runs()
+                return
+            if rel.endswith("gemma3-trace.jsonl"):
+                self.state.on_gemma3_trace_changed()
+                return
+            if rel.endswith("gemma4-trace.jsonl"):
+                self.state.on_gemma4_trace_changed()
                 return
             if rel.endswith("trace.jsonl"):
                 self.state.on_trace_changed()

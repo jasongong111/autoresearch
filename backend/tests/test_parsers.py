@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from dashboard.server.parsers import compute_summary, parse_log_file, parse_tsv_rows
-from dashboard.server.schemas import Command, command_from_path
+from backend.app.core.parsers import compute_summary, parse_log_file, parse_tsv_rows
+from backend.app.core.schemas import Command, command_from_path
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

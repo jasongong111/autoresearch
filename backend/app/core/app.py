@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .state import DashboardState
+from backend.app.core.state import DashboardState
 
 
 def create_app(state: DashboardState, static_dir: Optional[Path] = None) -> FastAPI:
@@ -88,6 +88,18 @@ def create_app(state: DashboardState, static_dir: Optional[Path] = None) -> Fast
         if not state.get_run(run_id):
             raise HTTPException(404, f"Run not found: {run_id}")
         return {"events": state.get_run_trace(run_id)}
+
+    @app.get("/api/runs/{run_id:path}/gemma4-trace")
+    def get_run_gemma4_trace(run_id: str) -> dict:
+        if not state.get_run(run_id):
+            raise HTTPException(404, f"Run not found: {run_id}")
+        return {"events": state.get_run_gemma4_trace(run_id)}
+
+    @app.get("/api/runs/{run_id:path}/gemma3-trace")
+    def get_run_gemma3_trace(run_id: str) -> dict:
+        if not state.get_run(run_id):
+            raise HTTPException(404, f"Run not found: {run_id}")
+        return {"events": state.get_run_gemma3_trace(run_id)}
 
     @app.get("/api/runs/{run_id:path}/analytics")
     def get_run_analytics(run_id: str) -> dict:

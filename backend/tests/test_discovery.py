@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from dashboard.server.discovery import active_run_id, discover_projects, discover_runs
+from backend.app.core.discovery import active_run_id, discover_projects, discover_runs
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

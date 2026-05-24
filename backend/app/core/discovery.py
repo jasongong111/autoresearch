@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 
-from .parsers import parse_tsv_rows, read_tsv_metadata
-from .schemas import LOG_SCHEMAS, ProjectInfo, RunInfo, command_from_path
+from backend.app.core.parsers import parse_tsv_rows, read_tsv_metadata
+from backend.app.core.schemas import LOG_SCHEMAS, ProjectInfo, RunInfo, command_from_path
 
 
 def discover_project_roots(project_root: Path) -> List[Path]:

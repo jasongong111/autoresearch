@@ -2,8 +2,10 @@
 
 from pathlib import Path
 
-from dashboard.server.trace import (
+from backend.app.core.trace import (
     discover_run_artifacts,
+    gemma3_trace_file_path,
+    gemma4_trace_file_path,
     parse_trace_analytics,
     parse_trace_jsonl,
 )
@@ -23,6 +25,27 @@ def test_parse_trace_jsonl():
 
 def test_parse_trace_jsonl_missing():
     assert parse_trace_jsonl(Path("/nonexistent/trace.jsonl")) == []
+
+
+def test_gemma4_trace_file_path_is_separate_from_observer_trace(tmp_path: Path):
+    assert gemma4_trace_file_path(tmp_path) == tmp_path / ".autoresearch" / "gemma4-trace.jsonl"
+
+
+def test_gemma3_trace_file_path_is_separate_from_observer_trace(tmp_path: Path):
+    assert gemma3_trace_file_path(tmp_path) == tmp_path / ".autoresearch" / "gemma3-trace.jsonl"
+
+
+def test_parse_trace_jsonl_preserves_structured_payloads():
+    events = parse_trace_jsonl(FIXTURES / "gemma3_trace.jsonl")
+
+    assert len(events) == 2
+    request = events[0].to_dict()
+    response = events[1].to_dict()
+    assert request["phase"] == "api_request"
+    assert request["request"]["messages"][1]["content"] == "What is 40 + 2?"
+    assert "Authorization" not in str(request["request"])
+    assert response["phase"] == "api_response"
+    assert response["response"]["choices"][0]["message"]["content"] == "42"
 
 
 def test_parse_trace_analytics():

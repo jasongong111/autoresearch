@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .schemas import (
+from backend.app.core.schemas import (
     SCHEMA_BY_FILENAME,
     Command,
     NormalizedIteration,

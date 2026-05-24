@@ -9,17 +9,24 @@ import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 
-from .discovery import active_run_id, discover_projects, discover_runs
-from .git_ops import ExperimentCommit, commit_diff_stat, list_experiment_commits
-from .parsers import compute_summary, parse_log_file
-from .schemas import ProjectInfo, RunInfo
-from .conversations import (
+from backend.app.core.discovery import active_run_id, discover_projects, discover_runs
+from backend.app.core.git_ops import ExperimentCommit, commit_diff_stat, list_experiment_commits
+from backend.app.core.parsers import compute_summary, parse_log_file
+from backend.app.core.schemas import ProjectInfo, RunInfo
+from backend.app.core.conversations import (
     conversation_sources_fingerprint,
     discover_conversations,
     get_conversation_turns,
     resolve_transcript_dirs,
 )
-from .trace import discover_run_artifacts, parse_trace_analytics, parse_trace_jsonl, trace_file_path
+from backend.app.core.trace import (
+    discover_run_artifacts,
+    gemma3_trace_file_path,
+    gemma4_trace_file_path,
+    parse_trace_analytics,
+    parse_trace_jsonl,
+    trace_file_path,
+)
 
 
 class DashboardState:
@@ -111,6 +118,14 @@ class DashboardState:
 
     def get_run_trace(self, run_id: str) -> List[dict]:
         path = trace_file_path(self._project_root_for_run(run_id))
+        return [event.to_dict() for event in parse_trace_jsonl(path)]
+
+    def get_run_gemma3_trace(self, run_id: str) -> List[dict]:
+        path = gemma3_trace_file_path(self._project_root_for_run(run_id))
+        return [event.to_dict() for event in parse_trace_jsonl(path)]
+
+    def get_run_gemma4_trace(self, run_id: str) -> List[dict]:
+        path = gemma4_trace_file_path(self._project_root_for_run(run_id))
         return [event.to_dict() for event in parse_trace_jsonl(path)]
 
     def get_run_analytics(self, run_id: str) -> dict:
@@ -287,6 +302,12 @@ class DashboardState:
             changed = self._load_trace(force=True)
         if changed:
             self._schedule_publish({"type": "trace_updated"})
+
+    def on_gemma4_trace_changed(self) -> None:
+        self._schedule_publish({"type": "trace_updated", "traceKind": "gemma4"})
+
+    def on_gemma3_trace_changed(self) -> None:
+        self._schedule_publish({"type": "trace_updated", "traceKind": "gemma3"})
 
     def on_artifacts_changed(self, run_id: str) -> None:
         self.invalidate_artifacts(run_id)
