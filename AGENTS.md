@@ -10,6 +10,34 @@ Autonomous goal-directed iteration based on [Karpathy's autoresearch](https://gi
 
 ---
 
+## Project Research Question
+
+This project investigates whether optimized agentic skills can help a small language model approach the performance of state-of-the-art models on complex agentic tasks.
+
+Use Gemma 3 as the small-model testbed. The central research question is:
+
+> Can optimized agentic skills help small models approach the performance of state-of-the-art models?
+
+The experimental comparison should preserve three distinct conditions:
+
+1. **Gemma 3 without skill support** — baseline small-model performance.
+2. **Gemma 3 with a frontier-generated skill** — measures initial skill transfer.
+3. **Gemma 3 with an optimized skill** — measures the additional gain from iterative skill refinement.
+
+The autoresearch agent is an external observer and optimizer, not the model under evaluation. It may inspect results, traces, metrics, and failures, then modify the skill. It should not change the benchmark, evaluator, scoring pipeline, or Gemma 4 model configuration unless the user explicitly asks.
+
+For this research track, interpret the loop as:
+
+```text
+Modify skill -> Run Gemma 3 -> Score result -> Keep/Discard -> Repeat
+```
+
+Keep the editable target restricted to the skill. Keep verification mechanical, numeric, and reproducible. Treat `.autoresearch/gemma4-trace.jsonl` as the Gemma 4 execution trace and `.autoresearch/trace.jsonl` as the autoresearch observer/optimizer trace.
+
+Within the Modify step, "the skill" means the complete agent skill package: `SKILL.md`, deterministic scripts or CLIs the agent can run, reference documentation such as domain rules and FAQs, and reusable assets such as code templates, boilerplate files, and configurations.
+
+---
+
 ## Installation
 
 ### Claude Code (plugin)
@@ -72,13 +100,13 @@ cp -r autoresearch/plugins/autoresearch ~/.agents/plugins/autoresearch
 Watch iteration logs and git experiments in a local web UI while any autoresearch command runs:
 
 ```bash
-./dashboard/scripts/setup-env.sh
+./backend/scripts/setup-env.sh
 conda activate autoresearch-dashboard
-cd dashboard/web && npm install && npm run build && cd ../..
+cd frontend && npm install && npm run build && cd ..
 ./bin/autoresearch-dashboard --project /path/to/target/repo
 ```
 
-Open http://127.0.0.1:3847. See [dashboard/README.md](dashboard/README.md) for dev mode, API, and supported log formats.
+Open http://127.0.0.1:3847. See [backend/README.md](backend/README.md) for dev mode, API, and supported log formats.
 
 ---
 

@@ -5,7 +5,7 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 export PYTHONPATH="${ROOT}:${PYTHONPATH:-}"
 
 ENV_NAME="autoresearch-dashboard"
-MAIN_ARGS=(-m dashboard.server.main "$@")
+MAIN_ARGS=(-m backend.app.main "$@")
 
 # Prefer active conda env when it matches the dashboard env
 if [[ "${CONDA_DEFAULT_ENV:-}" == "${ENV_NAME}" ]] && command -v python >/dev/null 2>&1; then

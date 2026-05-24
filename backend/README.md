@@ -1,11 +1,11 @@
-# Autoresearch Dashboard
+# Autoresearch Backend
 
-Real-time web UI for monitoring autoresearch agent runs. Watches iteration TSV logs and `experiment:` git commits in any target project.
+Real-time web UI and run orchestration API for autoresearch agent runs. Watches iteration TSV logs and `experiment:` git commits in any target project, and can spawn autoresearch runs via the web interface.
 
 ## Requirements
 
 - [Conda](https://docs.conda.io/en/latest/miniconda.html) (Miniconda or Anaconda) — **recommended**
-- Node.js 18+ (to build the UI once)
+- Node.js 18+ (to build the frontend once)
 
 ## Quick start
 
@@ -13,13 +13,13 @@ From the autoresearch repo (or any checkout):
 
 ```bash
 # Create/update the conda environment (one-time)
-./dashboard/scripts/setup-env.sh
+./backend/scripts/setup-env.sh
 conda activate autoresearch-dashboard
 
 # Build the web UI (first time only)
-cd dashboard/web && npm install && npm run build && cd ../..
+cd frontend && npm install && npm run build && cd ..
 
-# Start the dashboard watching your project
+# Start the web app watching your project
 ./bin/autoresearch-dashboard --project /path/to/your/project
 ```
 
@@ -32,15 +32,15 @@ Open **http://127.0.0.1:3847** in your browser.
 Build and run from the **autoresearch repo root** so the image can watch the workspace (including `tasks/*` projects):
 
 ```bash
-docker compose -f dashboard/docker-compose.yml up --build
+docker compose up --build
 ```
 
-Open **http://127.0.0.1:3847**. The compose file mounts the repo at `/workspace` inside the container (read-only). Set `DASHBOARD_WORKSPACE` in `dashboard/.env` if you want to watch a different host directory.
+Open **http://127.0.0.1:3847**. The compose file mounts the repo at `/workspace` inside the container (read-only). Set `DASHBOARD_WORKSPACE` in `.env` if you want to watch a different host directory.
 
 ### Plain `docker run`
 
 ```bash
-docker build -f dashboard/Dockerfile -t autoresearch-dashboard .
+docker build -f backend/Dockerfile -t autoresearch-dashboard .
 docker run --rm -p 3847:3847 \
   -v "$(pwd):/workspace:ro" \
   -e DASHBOARD_PROJECT=/workspace \
@@ -55,7 +55,7 @@ docker run --rm -p 3847:3847 \
 | `DASHBOARD_HOST` | `0.0.0.0` | Bind address (use `0.0.0.0` in containers) |
 | `DASHBOARD_PORT` | `3847` | HTTP port inside the container |
 
-Optional CLI args are passed through the entrypoint, e.g. `--transcripts-dir /transcripts` when you mount transcripts. Docker Compose sets `CURSOR_TRANSCRIPTS_DIR` in `dashboard/.env` so the **Conversation** tab streams Cursor agent transcripts in near real time (~2s).
+Optional CLI args are passed through the entrypoint, e.g. `--transcripts-dir /transcripts` when you mount transcripts. Docker Compose sets `CURSOR_TRANSCRIPTS_DIR` in `.env` so the **Conversation** tab streams Cursor agent transcripts in near real time (~2s).
 
 ### Cloud deployment notes
 
@@ -84,8 +84,8 @@ The **Conversation** tab polls Cursor transcript JSONL every ~2 seconds (plus fi
 Manual conda commands:
 
 ```bash
-conda env create -f dashboard/environment.yml    # first time
-conda env update -f dashboard/environment.yml --prune   # after dependency changes
+conda env create -f backend/environment.yml    # first time
+conda env update -f backend/environment.yml --prune   # after dependency changes
 conda activate autoresearch-dashboard
 ```
 
@@ -94,8 +94,8 @@ conda activate autoresearch-dashboard
 If you cannot use conda, install into any Python 3.11+ virtualenv:
 
 ```bash
-python3.12 -m pip install -r dashboard/requirements.txt
-PYTHONPATH=. python3.12 -m dashboard.server.main --project .
+python3.12 -m pip install -r backend/requirements.txt
+PYTHONPATH=. python3.12 -m backend.app.main --project .
 ```
 
 ## Development mode
@@ -109,7 +109,7 @@ conda activate autoresearch-dashboard
 ./bin/autoresearch-dashboard --project . --port 3847
 
 # Terminal 2 — Vite dev server (proxies /api to :3847)
-cd dashboard/web && npm run dev
+cd frontend && npm run dev
 ```
 
 Open **http://127.0.0.1:5174**.
@@ -122,7 +122,7 @@ Open **http://127.0.0.1:5174**.
 | `--transcripts-dir PATH` | auto-detect Cursor | Agent conversation JSONL directory (repeatable) |
 | `--port` | `3847` | HTTP port |
 | `--host` | `127.0.0.1` | Bind address |
-| `--static PATH` | `dashboard/web/dist` | Built React assets |
+| `--static PATH` | `frontend/dist` | Built React assets |
 
 ## What it watches
 
@@ -145,32 +145,54 @@ If the agent writes `.autoresearch/session.json` at loop start, the dashboard sh
 
 ## API
 
+### Dashboard (read-only monitoring)
+
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/health` | Server status and watched project |
 | `GET /api/projects` | Watched project roots (`tasks/*` included even without runs) |
 | `GET /api/runs` | Discovered log files and project list |
+| `GET /api/runs/{id}` | Single run details with session and active status |
 | `GET /api/runs/{id}/iterations` | Normalized iteration rows |
 | `GET /api/runs/{id}/summary` | Aggregates (keeps, discards, stuck warning) |
 | `GET /api/git/commits` | Recent `experiment:` commits |
+| `GET /api/git/commits/{hash}/stat` | Diff stat for a commit |
 | `GET /api/trace` | Live agent trace events from `.autoresearch/trace.jsonl` |
-| `GET /api/analytics` | Aggregated trace, model cost/usage, score, user, and latency metrics from `.autoresearch/trace.jsonl` |
-| `GET /api/runs/{id}/trace` | Trace events from the selected run's project root |
-| `GET /api/runs/{id}/analytics` | Analytics from the selected run's project root |
-| `GET /api/conversations` | Agent conversation sessions (Cursor transcripts + local JSONL) |
-| `GET /api/conversations/{id}/turns` | Full conversation turns with text, thinking, tools, MCP |
-| `GET /api/runs/{id}/artifacts` | Trace markdown/JSONL files in the run directory |
-| `GET /api/events` | SSE stream (`run_updated`, `git_updated`, `trace_updated`, `conversation_updated`) |
+| `GET /api/analytics` | Aggregated trace, model cost/usage, score, user, and latency metrics |
+| `GET /api/runs/{id}/trace` | Per-run agent trace |
+| `GET /api/runs/{id}/gemma4-trace` | Per-run Gemma4 execution trace |
+| `GET /api/runs/{id}/gemma3-trace` | Per-run Gemma3 execution trace |
+| `GET /api/runs/{id}/analytics` | Per-run analytics |
+| `GET /api/conversations` | Agent conversation sessions |
+| `GET /api/conversations/{id}/turns` | Full conversation turns |
+| `GET /api/runs/{id}/artifacts` | Trace markdown/JSONL artifacts |
+| `GET /api/events` | SSE stream for live updates |
+
+### Orchestrator (run management)
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/orchestrator/configs` | Create a run configuration |
+| `GET /api/orchestrator/configs` | List saved configurations |
+| `GET /api/orchestrator/configs/{id}` | Get a configuration |
+| `PUT /api/orchestrator/configs/{id}` | Update a configuration |
+| `DELETE /api/orchestrator/configs/{id}` | Delete a configuration |
+| `POST /api/orchestrator/configs/validate` | Dry-run a verify command |
+| `POST /api/orchestrator/configs/{id}/start` | Start a run from a configuration |
+| `GET /api/orchestrator/instances` | List run instances |
+| `GET /api/orchestrator/instances/{id}` | Get a run instance |
+| `POST /api/orchestrator/instances/{id}/stop` | Stop a running instance |
+| `GET /api/orchestrator/instances/{id}/logs` | Get stdout/stderr logs |
 
 ## Tests
 
 ```bash
 conda activate autoresearch-dashboard
-PYTHONPATH=. pytest dashboard/tests/ -q
+PYTHONPATH=. pytest backend/tests/ -q
 ```
 
 Or without activating:
 
 ```bash
-conda run -n autoresearch-dashboard env PYTHONPATH=. pytest dashboard/tests/ -q
+conda run -n autoresearch-dashboard env PYTHONPATH=. pytest backend/tests/ -q
 ```
