@@ -15,11 +15,11 @@ metadata:
   short-description: Autonomous goal-directed iteration engine
 ---
 
-# Codex Autoresearch — Autonomous Goal-directed Iteration
+# Codex Autoresearch — Autonomous Goal-directed Skill Optimization
 
-Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch). Applies constraint-driven autonomous iteration to ANY work — not just ML research.
+Inspired by [Karpathy's autoresearch](https://github.com/karpathy/autoresearch). In this repository, the loop is used to optimize an agent skill package, not arbitrary application code.
 
-**Core idea:** You are an autonomous agent. Modify → Verify → Keep/Discard → Repeat.
+**Core idea:** You are an autonomous skill optimizer. Modify the skill package → Verify with the target model/task → Keep/Discard → Repeat.
 
 ## Safety Posture (read once per session)
 
@@ -714,7 +714,7 @@ Use a SINGLE direct prompting call with these 4 questions:
 | # | Header | Question | Options (smart defaults from codebase scan) |
 |---|--------|----------|----------------------------------------------|
 | 1 | `Goal` | "What do you want to improve?" | "Test coverage (higher)", "Bundle size (lower)", "Performance (faster)", "Code quality (fewer errors)" |
-| 2 | `Scope` | "Which files can autoresearch modify?" | Suggested globs from project structure (e.g. "src/**/*.ts", "content/**/*.md") |
+| 2 | `Scope` | "Which skill-package files can autoresearch modify?" | Suggested skill globs (e.g. "SKILL.md", "references/**", "scripts/**", "assets/**") |
 | 3 | `Metric` | "What number tells you if it got better? (must be a command output, not subjective)" | Detected options: "coverage % (higher)", "bundle size KB (lower)", "error count (lower)", "test pass count (higher)" |
 | 4 | `Direction` | "Higher or lower is better?" | "Higher is better", "Lower is better" |
 
@@ -744,11 +744,18 @@ Use a SINGLE direct prompting call with these 4 questions:
 
 Read `references/autonomous-loop-protocol.md` for full protocol details.
 
+In this repository, the Modify step may only change the agent skill package:
+
+- `SKILL.md` — routing, core behavior, and concise operating instructions
+- deterministic scripts or tools — code/CLIs the agent can run during future attempts
+- references — larger documentation, deep domain rules, FAQs, and examples
+- assets — code templates, boilerplate files, configurations, or other reusable artifacts
+
 ```
 LOOP (FOREVER or N times):
   1. Review: Read current state + git history + results log
   2. Ideate: Pick next change based on goal, past results, what hasn't been tried
-  3. Modify: Make ONE focused change to in-scope files
+  3. Modify: Make ONE focused change to the skill package
   4. Commit: Git commit the change (before verification)
   5. Verify: Run the mechanical metric (tests, build, benchmark, etc.)
   6. Guard: If guard is set, run the guard command
@@ -781,27 +788,16 @@ LOOP (FOREVER or N times):
 
 See `references/core-principles.md` for the 7 generalizable principles from autoresearch.
 
-## Adapting to Different Domains
+## Skill-Package Optimization Scope
 
-| Domain | Metric | Scope | Verify Command | Guard |
-|--------|--------|-------|----------------|-------|
-| Backend code | Tests pass + coverage % | `src/**/*.ts` | `npm test` | — |
-| Frontend UI | Lighthouse score | `src/components/**` | `npx lighthouse` | `npm test` |
-| ML training | val_bpb / loss | `train.py` | `uv run train.py` | — |
-| Blog/content | Word count + readability | `content/*.md` | Custom script | — |
-| Performance | Benchmark time (ms) | Target files | `npm run bench` | `npm test` |
-| Refactoring | Tests pass + LOC reduced | Target module | `npm test && wc -l` | `npm run typecheck` |
-| Security | OWASP + STRIDE coverage + findings | API/auth/middleware | `$autoresearch security` | — |
-| Shipping | Checklist pass rate (%) | Any artifact | `$autoresearch ship` | Domain-specific |
-| Debugging | Bugs found + coverage | Target files | `$autoresearch debug` | — |
-| Fixing | Error count (lower) | Target files | `$autoresearch fix` | `npm test` |
-| Scenario analysis | Scenario coverage score (higher) | Feature/domain files | `$autoresearch scenario` | — |
-| Scenarios | Use cases + edge cases + dimension coverage | Target feature/files | `$autoresearch scenario` | — |
-| Prediction | Findings + hypotheses (higher) | Target files | `$autoresearch predict` | — |
-| Documentation | Validation pass rate (higher) | `docs/*.md` | `$autoresearch learn` | `npm test` |
-| Subjective refinement | Judge consensus + convergence (higher) | Any subjective content | `$autoresearch reason` | — |
+| Editable artifact | Purpose | Example |
+|-------------------|---------|---------|
+| `SKILL.md` | Routing, core behavior, and concise operating instructions | Add a rule for when to call a deterministic tool |
+| `references/**` | Massive documentation, deep domain rules, worked examples, FAQs | Add geometry edge cases or scoring-specific guidance |
+| `scripts/**` | Deterministic code or CLIs the agent can run | Add a fraction simplifier or answer normalizer |
+| `assets/**` | Reusable templates, boilerplate files, configurations | Add answer templates or tool config files |
 
-Adapt the loop to your domain. The PRINCIPLES are universal; the METRICS are domain-specific.
+The metric is always task-specific and mechanical, such as a target-model benchmark score. The guard should protect evaluator integrity, benchmark reproducibility, and any files outside the skill package.
 
 ## Post-Completion: Support Prompt (Once Per Project)
 

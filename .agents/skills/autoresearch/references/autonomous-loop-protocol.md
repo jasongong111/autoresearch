@@ -112,14 +112,14 @@ git show abc1234 --stat
 
 ```
 # Agent reads git log and sees:
-# a1b2c3d experiment(api): add response caching — KEPT (metric improved)
-# d4e5f6g Revert "experiment(api): increase cache TTL to 60s" — REVERTED
-# c3d4e5f experiment(api): add cache invalidation on write — KEPT
+# a1b2c3d experiment(skill): add fraction simplifier tool — KEPT (metric improved)
+# d4e5f6g Revert "experiment(skill): add broad geometry rewrite" — REVERTED
+# c3d4e5f experiment(skill): add triangle area edge cases — KEPT
 #
 # Agent learns:
-# ✓ Caching works (2 kept commits)
-# ✗ Increasing TTL didn't help (reverted)
-# → Next: try a different cache strategy, NOT longer TTL
+# ✓ Deterministic arithmetic support works (kept commit)
+# ✗ Broad strategy rewrites did not help (reverted)
+# → Next: add another focused tool/reference, NOT another broad rewrite
 ```
 
 ### Git Memory Integration with the Autonomous Loop
@@ -261,9 +261,16 @@ Pick the NEXT change. **MUST consult git history and results log before deciding
 
 **Bounded mode consideration:** If remaining iterations are limited (<3 left), prioritize exploiting successes over exploration.
 
-## Phase 3: Modify (One Atomic Change)
+## Phase 3: Modify (One Atomic Skill-Package Change)
 
-- Make ONE focused change to in-scope files
+For this repository, the loop optimizes the agent skill package only. The Modify step may change:
+
+- `SKILL.md` — routing, core behavior, and concise operating instructions
+- deterministic scripts or tools — code/CLIs the agent can run during future attempts
+- references — larger documentation, deep domain rules, FAQs, and examples
+- assets — code templates, boilerplate files, configurations, or other reusable artifacts
+
+- Make ONE focused change to in-scope skill-package files
 - The change should be explainable in one sentence
 - Write the description BEFORE making the change (forces clarity)
 
@@ -275,22 +282,22 @@ One logical change may span multiple files. This is still ONE change if it serve
 
 | One Change (OK) | Two Changes (Split) |
 |-----------------|---------------------|
-| Change port 3000→8080 in Dockerfile + compose + nginx | Change port AND add new service |
-| Update Node 18→20 in Dockerfile + CI + package.json | Update Node AND switch to pnpm |
-| Add Redis in compose + app config + env vars | Add Redis AND refactor auth module |
+| Add a calculator CLI and document when to call it | Add a calculator CLI AND rewrite task strategy |
+| Expand geometry reference examples in one document | Expand geometry examples AND add algebra templates |
+| Add one reusable answer template asset | Add templates AND change verification scripts |
 
-#### DevOps Example
+#### Skill-Package Example
 
 ```bash
-# Iteration 1: Enable Docker layer caching (2 files, one intent)
-git add Dockerfile .github/workflows/ci.yml
-git commit -m "experiment(ci): enable Docker layer caching"
-# ✓ One change: "enable caching" — same intent across files
+# Iteration 1: Add deterministic fraction simplifier (2 files, one intent)
+git add scripts/simplify_fraction.py references/arithmetic.md
+git commit -m "experiment(skill): add fraction simplifier tool"
+# ✓ One change: "add fraction simplifier" — same intent across files
 
-# Iteration 2: Parallelize test jobs (1 file)
-git add .github/workflows/ci.yml
-git commit -m "experiment(ci): parallelize tests with matrix strategy"
-# ✓ One change: "parallelize tests"
+# Iteration 2: Expand a single geometry reference (1 file)
+git add references/geometry.md
+git commit -m "experiment(skill): add triangle area edge cases"
+# ✓ One change: "add triangle area edge cases"
 ```
 
 ### Enforcing Atomicity — Self-Check
@@ -314,9 +321,9 @@ Configure how strictly the agent enforces the one-change-per-iteration rule:
 
 ```
 $autoresearch
-Goal: Optimize API response time
-Scope: src/api/**/*.ts
-Verify: wrk -t2 -c10 -d10s http://localhost:3000 | grep 'Avg Lat' | awk '{print $2}'
+Goal: Improve Gemma 3 math task score by optimizing the math skill
+Scope: SKILL.md, references/**, scripts/**, assets/**
+Verify: ./tests/verify-metric.sh
 Atomicity: strict       # enforce one-change rule (default)
 Max-Files-Per-Change: 3  # alert if >3 files modified in one iteration
 ```
@@ -332,11 +339,11 @@ Max-Files-Per-Change: 3  # alert if >3 files modified in one iteration
 
 ```bash
 # Step 1: Before making any change, write the description
-DESCRIPTION="add response caching to /api/users endpoint"
+DESCRIPTION="add fraction simplifier tool"
 # Test: Can this be said in ONE sentence without "and"? → Yes ✓
 
 # Step 2: Make the change (modify files)
-# ... edit src/api/users.ts ...
+# ... edit scripts/simplify_fraction.py and references/arithmetic.md ...
 
 # Step 3: Validate atomicity before committing
 FILES_CHANGED=$(git diff --name-only | wc -l | tr -d ' ')
@@ -357,30 +364,30 @@ echo "$DESCRIPTION" | grep -qE '\band\b.*\b(add|remove|change|update|fix)\b' && 
 
 # Step 5: Commit only if atomicity validated
 git add <specific-files>
-git commit -m "experiment(api): ${DESCRIPTION}"
+git commit -m "experiment(skill): ${DESCRIPTION}"
 ```
 
 **Examples of atomicity enforcement:**
 
 ```
 # ✓ ATOMIC — passes all checks:
-Description: "add response caching to /api/users"
-Files changed: 1 (src/api/users.ts)
+Description: "add arithmetic word-problem reference"
+Files changed: 1 (references/arithmetic.md)
 → Commit proceeds
 
 # ✓ ATOMIC — multi-file but single intent:
-Description: "add Redis caching layer"
-Files changed: 3 (docker-compose.yml, src/cache.ts, src/api/users.ts)
+Description: "add fraction simplifier tool"
+Files changed: 2 (scripts/simplify_fraction.py, references/arithmetic.md)
 → Same intent across files, commit proceeds
 
 # ✗ NOT ATOMIC — fails one-sentence test:
-Description: "add caching AND refactor error handling"
+Description: "add calculator tool AND rewrite geometry strategy"
 → Contains "and" linking unrelated actions
-→ Split into: iteration N = "add caching", iteration N+1 = "refactor error handling"
+→ Split into: iteration N = "add calculator tool", iteration N+1 = "rewrite geometry strategy"
 
 # ✗ NOT ATOMIC — too many unrelated files:
-Description: "optimize performance"
-Files changed: 12 (across api, db, frontend, config)
+Description: "optimize the skill"
+Files changed: 12 (across SKILL.md, references, scripts, assets)
 → Too broad — split into focused iterations
 ```
 
