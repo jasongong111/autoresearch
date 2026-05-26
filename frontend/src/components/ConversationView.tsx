@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ContentBlock, ConversationInfo, ConversationTurn } from "./types";
+import { conversationIdForInstance } from "../lib/activeRun";
+import type { ContentBlock, ConversationInfo, ConversationTurn, RunInstance } from "../types";
 
 interface Props {
   conversations: ConversationInfo[];
   turns: ConversationTurn[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  transcriptDirs: string[];
   followLive: boolean;
   onFollowLiveChange: (value: boolean) => void;
   liveUpdating: boolean;
+  linkedInstanceId?: string | null;
+  linkedConversationId?: string | null;
+  pendingConversationId?: string | null;
+  orchestratorInstances?: RunInstance[];
+  workspaceProject?: string;
 }
 
 type BlockFilter = "all" | "hide_thinking" | "tools_only";
@@ -82,19 +87,54 @@ function filterBlocks(blocks: ContentBlock[], filter: BlockFilter): ContentBlock
   return blocks.filter((b) => b.type === "tool_use" || b.type === "mcp" || b.type === "tool_result");
 }
 
+function instanceLabel(instance: RunInstance, conv: ConversationInfo | undefined): string {
+  const started = instance.started_at
+    ? new Date(instance.started_at).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : instance.id;
+  if (conv) {
+    return `${started} · ${instance.status} · ${conv.title}`;
+  }
+  return `${started} · ${instance.status} · awaiting transcript`;
+}
+
 export default function ConversationView({
   conversations,
   turns,
   selectedId,
   onSelect,
-  transcriptDirs,
   followLive,
   onFollowLiveChange,
   liveUpdating,
+  linkedInstanceId,
+  linkedConversationId,
+  pendingConversationId,
+  orchestratorInstances = [],
+  workspaceProject = "",
 }: Props) {
   const [blockFilter, setBlockFilter] = useState<BlockFilter>("all");
   const threadRef = useRef<HTMLDivElement>(null);
   const prevTurnCountRef = useRef(0);
+
+  const runOptions = useMemo(() => {
+    return orchestratorInstances
+      .map((instance) => {
+        const conversationId = conversationIdForInstance(instance, workspaceProject);
+        if (!conversationId) return null;
+        const conv = conversations.find((c) => c.id === conversationId);
+        return {
+          instanceId: instance.id,
+          conversationId,
+          label: instanceLabel(instance, conv),
+          hasTranscript: !!conv,
+        };
+      })
+      .filter((opt): opt is NonNullable<typeof opt> => opt != null);
+  }, [orchestratorInstances, conversations, workspaceProject]);
 
   useEffect(() => {
     if (turns.length <= prevTurnCountRef.current) {
@@ -124,29 +164,46 @@ export default function ConversationView({
     return { tools, mcp, thinking, turns: turns.length };
   }, [turns]);
 
-  if (conversations.length === 0) {
+  if (orchestratorInstances.length === 0 && !pendingConversationId) {
     return (
       <p className="empty">
-        No agent conversations found. The dashboard auto-detects Cursor transcripts at{" "}
-        <code>~/.cursor/projects/…/agent-transcripts/</code>, or pass{" "}
-        <code>--transcripts-dir</code>. You can also mirror a session to{" "}
-        <code>.autoresearch/conversation.jsonl</code>.
+        No orchestrator runs yet. Start one from the <strong>Runs</strong> page; this tab shows
+        conversation for those runs only, not other agent sessions on your machine.
       </p>
     );
   }
 
+  const waitingForTranscript =
+    pendingConversationId != null &&
+    !conversations.some((c) => c.id === pendingConversationId);
+
   return (
     <div className="conv-panel">
+      {linkedInstanceId && (
+        <div className="conv-linked-run">
+          Following orchestrator run <code className="mono">{linkedInstanceId}</code>
+          {linkedConversationId ? (
+            <>
+              {" "}
+              · conversation <code className="mono">{linkedConversationId.slice(0, 12)}…</code>
+            </>
+          ) : null}
+        </div>
+      )}
       <div className="conv-toolbar">
         <select
           className="select conv-session-select"
-          value={selectedId ?? ""}
+          value={selectedId ?? pendingConversationId ?? ""}
           onChange={(e) => onSelect(e.target.value)}
         >
-          {conversations.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.kind === "subagent" ? "↳ " : ""}
-              {c.title} ({c.turnCount} turns)
+          {runOptions.length === 0 && waitingForTranscript && pendingConversationId && (
+            <option value={pendingConversationId}>
+              Pending transcript ({pendingConversationId.slice(0, 12)}…)
+            </option>
+          )}
+          {runOptions.map((opt) => (
+            <option key={opt.instanceId} value={opt.conversationId}>
+              {opt.label}
             </option>
           ))}
         </select>
@@ -173,30 +230,37 @@ export default function ConversationView({
         </span>
       </div>
 
-      {transcriptDirs.length > 0 && (
-        <div className="conv-sources">
-          Sources: {transcriptDirs.map((d) => d.split("/").slice(-2).join("/")).join(", ")}
-        </div>
+      {waitingForTranscript && (
+        <p className="conv-pending">
+          Waiting for agent transcript for <code className="mono">{pendingConversationId}</code>.
+          {liveUpdating ? " Checking for updates…" : " It will appear when the agent writes messages."}
+        </p>
       )}
 
       <div className="conv-thread" ref={threadRef}>
-        {turns.map((turn) => {
-          const blocks = filterBlocks(turn.blocks, blockFilter);
-          if (blocks.length === 0) return null;
-          return (
-            <article key={turn.index} className={`conv-turn ${turn.role}`}>
-              <header className="conv-turn-header">
-                <span className="conv-role">{turn.role}</span>
-                <span className="conv-turn-index">#{turn.index + 1}</span>
-              </header>
-              <div className="conv-blocks">
-                {blocks.map((block, i) => (
-                  <BlockView key={`${turn.index}-${i}`} block={block} />
-                ))}
-              </div>
-            </article>
-          );
-        })}
+        {turns.length === 0 && waitingForTranscript ? (
+          <p className="empty">No turns yet for this run.</p>
+        ) : turns.length === 0 ? (
+          <p className="empty">Select an orchestrator run to view its conversation.</p>
+        ) : (
+          turns.map((turn) => {
+            const blocks = filterBlocks(turn.blocks, blockFilter);
+            if (blocks.length === 0) return null;
+            return (
+              <article key={turn.index} className={`conv-turn ${turn.role}`}>
+                <header className="conv-turn-header">
+                  <span className="conv-role">{turn.role}</span>
+                  <span className="conv-turn-index">#{turn.index + 1}</span>
+                </header>
+                <div className="conv-blocks">
+                  {blocks.map((block, i) => (
+                    <BlockView key={`${turn.index}-${i}`} block={block} />
+                  ))}
+                </div>
+              </article>
+            );
+          })
+        )}
       </div>
     </div>
   );
