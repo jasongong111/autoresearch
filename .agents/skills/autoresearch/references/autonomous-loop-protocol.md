@@ -55,15 +55,30 @@ GUARD_BASELINE=$(<guard command>)
 
 ## Phase 1: Review (30 seconds)
 
-Before each iteration, build situational awareness. **You MUST complete ALL 6 steps — git history is critical for learning from past iterations.**
+Before each iteration, build situational awareness. **You MUST complete ALL 7 steps — git history and your own logs from the last round are critical for learning from past iterations.**
 
 ```
 1. Read current state of in-scope files (full context)
-2. Read last 10-20 entries from results log
-3. MUST run: git log --oneline -20 to see recent changes
-4. MUST run: git diff HEAD~1 (if last iteration was "keep") to review what worked
-5. Identify: what worked, what failed, what's untried — based on BOTH results log AND git history
-6. If bounded: check current_iteration vs max_iterations
+2. Read last 10-20 entries from autoresearch-results.tsv (the results log you wrote in prior rounds)
+3. Read the most recent record from .autoresearch/experiment.jsonl (the action log you wrote last round)
+   — review hypothesis, filesModified, verifyOutput/guardOutput, status, and description
+4. MUST run: git log --oneline -20 to see recent changes
+5. MUST run: git diff HEAD~1 (if last iteration was "keep") to review what worked
+6. Identify: what worked, what failed, what's untried — based on results log, experiment.jsonl, AND git history
+7. If bounded: check current_iteration vs max_iterations
+```
+
+**Why read your logs every time?** The TSV results log records outcomes (metric, delta, keep/discard). The experiment action log records *what you actually did* — hypothesis, files touched, and truncated verify/guard output. Read both before ideating so you do not repeat a failed hypothesis or miss a clue in last round's verify output.
+
+```bash
+# Results log — recent outcomes
+tail -20 autoresearch-results.tsv
+
+# Last round's full action record (required every iteration after baseline)
+tail -1 .autoresearch/experiment.jsonl
+
+# Optional: scan last few rounds for repeating discard/crash patterns
+tail -5 .autoresearch/experiment.jsonl
 ```
 
 **Why read git history every time?** Git IS the memory. After rollbacks, state may differ from what you expect. The git log shows which experiments were kept vs reverted. The git diff of kept changes reveals WHAT specifically improved the metric — use this to inform the next iteration. Never assume — always verify.
@@ -91,6 +106,10 @@ Git as Memory is **always enabled** — it's a core behavior, not optional. The 
 At the start of EVERY iteration (Phase 1), the agent runs:
 
 ```bash
+# Step 0: Read recent outcomes and last round's action log
+tail -20 autoresearch-results.tsv
+tail -1 .autoresearch/experiment.jsonl
+
 # Step 1: Read recent experiment history
 git log --oneline -20
 # Shows: kept commits remain, discarded ones were reverted
@@ -112,14 +131,14 @@ git show abc1234 --stat
 
 ```
 # Agent reads git log and sees:
-# a1b2c3d experiment(skill): add fraction simplifier tool — KEPT (metric improved)
-# d4e5f6g Revert "experiment(skill): add broad geometry rewrite" — REVERTED
-# c3d4e5f experiment(skill): add triangle area edge cases — KEPT
+# a1b2c3d experiment(api): add response caching — KEPT (metric improved)
+# d4e5f6g Revert "experiment(api): increase cache TTL to 60s" — REVERTED
+# c3d4e5f experiment(api): add cache invalidation on write — KEPT
 #
 # Agent learns:
-# ✓ Deterministic arithmetic support works (kept commit)
-# ✗ Broad strategy rewrites did not help (reverted)
-# → Next: add another focused tool/reference, NOT another broad rewrite
+# ✓ Caching works (2 kept commits)
+# ✗ Increasing TTL didn't help (reverted)
+# → Next: try a different cache strategy, NOT longer TTL
 ```
 
 ### Git Memory Integration with the Autonomous Loop
@@ -207,7 +226,7 @@ ensure_on_branch() {
 ### Complete Integration Example
 
 ```
-$autoresearch
+/autoresearch
 Goal: Improve ML model accuracy from 85% to 95%
 Scope: model.py, config.yaml
 Verify: python train.py --eval 2>&1 | grep 'accuracy' | awk '{print $2}'
@@ -236,19 +255,20 @@ $ git commit -m "experiment(model): increase hidden layers from 4 to 6"
 
 ## Phase 2: Ideate (Strategic)
 
-Pick the NEXT change. **MUST consult git history and results log before deciding.**
+Pick the NEXT change. **MUST consult git history, results log, and the last `.autoresearch/experiment.jsonl` record before deciding.**
 
 **How to use git as memory:**
 - Run `git log --oneline -10` — read commit messages to see what was tried
 - For each "keep" in results log, run `git show <commit-hash> --stat` to see what files/patterns worked
 - For discarded approaches, read the commit message to understand what was attempted and avoid repeating it
+- Read the last experiment.jsonl record — use `verifyOutput`, `hypothesis`, and `filesModified` to explain why the last round failed or succeeded
 - Look for patterns: if 3 commits improved metric by touching file X, focus on file X
 
 **Priority order:**
 
 1. **Fix crashes/failures** from previous iteration first
 2. **Exploit successes** — run `git diff` on last kept commit, try variants in same direction
-3. **Explore new approaches** — cross-reference results log AND git history to find untried approaches
+3. **Explore new approaches** — cross-reference results log, experiment.jsonl, AND git history to find untried approaches
 4. **Combine near-misses** — two changes that individually didn't help might work together
 5. **Simplify** — remove code while maintaining metric. Simpler = better
 6. **Radical experiments** — when incremental changes stall, try something dramatically different
@@ -261,18 +281,69 @@ Pick the NEXT change. **MUST consult git history and results log before deciding
 
 **Bounded mode consideration:** If remaining iterations are limited (<3 left), prioritize exploiting successes over exploration.
 
-## Phase 3: Modify (One Atomic Skill-Package Change)
+## Phase 3: Modify (One Atomic Change)
 
-For this repository, the loop optimizes the agent skill package only. The Modify step may change:
-
-- `SKILL.md` — routing, core behavior, and concise operating instructions
-- deterministic scripts or tools — code/CLIs the agent can run during future attempts
-- references — larger documentation, deep domain rules, FAQs, and examples
-- assets — code templates, boilerplate files, configurations, or other reusable artifacts
-
-- Make ONE focused change to in-scope skill-package files
+- Make ONE focused change to in-scope files
 - The change should be explainable in one sentence
 - Write the description BEFORE making the change (forces clarity)
+
+### Three-Level Skill Optimization Policy
+
+When optimizing an agent skill package, progress through these levels gradually. Start at the lowest level that directly addresses the failure evidence from Phase 1-2. Do not skip to a higher level just because it is more interesting, but also do not park on the same level indefinitely.
+
+**No level parking:** Do not spend more than 3 consecutive iterations at the same level without either a kept improvement or an explicit escalation. If two attempts at the same level crash, produce no diff, or are discarded for the same reason, escalate on the next iteration. Record the level in the experiment description, for example: `level 1: add answer-normalizer script`.
+
+#### Level 1: Outsource Procedural Tasks to Deterministic Code (`skills/<name>/scripts/`)
+
+Use Level 1 when the skill relies on prose to perform strict algorithmic work, such as parsing files, validating JSON, normalizing answers, checking directory layouts, or running sequential calculations. Text instructions for these tasks eventually hallucinate, skip steps, or apply rules inconsistently.
+
+**Action:** Identify the deterministic part of the workflow. Write a Python, Node, or Bash script under `skills/<name>/scripts/`, then replace the long prose procedure in `SKILL.md` with a short command contract.
+
+**Before (text-based):**
+```markdown
+Look at the directory structure. Check if every folder has an index file. If a folder is missing one, list it out...
+```
+
+**After (script-based):**
+```markdown
+Run `python3 skills/<name>/scripts/audit_layout.py`. If the exit code is non-zero, parse the printed JSON error array and present it to the user.
+```
+
+Level 1 changes are preferred before adding more prompt text whenever the failure is procedural and mechanically checkable.
+
+#### Level 2: Implement Progressive Disclosure (`skills/<name>/references/`)
+
+Use Level 2 when `SKILL.md` is getting bloated with edge cases, lookup tables, formatting rules, domain FAQs, or long background explanations. The main skill should route behavior; heavy details should load only when needed.
+
+**Action:** Move non-essential documentation into `skills/<name>/references/`, then add conditional gates in `SKILL.md` that say exactly when to read each reference and when not to.
+
+```markdown
+## Error Handling
+If the linting script fails with a formatting error, read `references/STYLE_GUIDE.md`
+to understand whitespace policies before suggesting a fix. Otherwise, do not read it.
+```
+
+Level 2 changes should reduce core prompt load while preserving retrieval precision.
+
+#### Level 3: Bind Explicit Tooling and Define a Strict Exit Protocol
+
+Use Level 3 when the agent is guessing which tool or command to use, looping over command variants, or failing to know when the skill is complete.
+
+**Action:** Bind each step to the environment's concrete capabilities (shell commands, scripts, native tools, or MCP endpoints when available), and end the workflow with an unambiguous Definition of Done.
+
+**Tool binding example:**
+```markdown
+Use the filesystem tool to write the output to `build.log`. Do not stream the full log back into chat.
+```
+
+**Exit protocol example:**
+```markdown
+The skill is complete only when `python3 scripts/verify.py` returns `status: 0`.
+If you hit three consecutive non-zero returns, halt immediately, print the exact logs,
+and yield control back to the user.
+```
+
+Level 3 changes should eliminate tool ambiguity and define hard stop conditions. Use this level after Level 1-2 have not stabilized execution, or when Phase 1 logs show repeated loops caused by unclear tooling or unclear completion criteria.
 
 ### Multi-File Atomic Changes
 
@@ -282,22 +353,22 @@ One logical change may span multiple files. This is still ONE change if it serve
 
 | One Change (OK) | Two Changes (Split) |
 |-----------------|---------------------|
-| Add a calculator CLI and document when to call it | Add a calculator CLI AND rewrite task strategy |
-| Expand geometry reference examples in one document | Expand geometry examples AND add algebra templates |
-| Add one reusable answer template asset | Add templates AND change verification scripts |
+| Change port 3000→8080 in Dockerfile + compose + nginx | Change port AND add new service |
+| Update Node 18→20 in Dockerfile + CI + package.json | Update Node AND switch to pnpm |
+| Add Redis in compose + app config + env vars | Add Redis AND refactor auth module |
 
-#### Skill-Package Example
+#### DevOps Example
 
 ```bash
-# Iteration 1: Add deterministic fraction simplifier (2 files, one intent)
-git add scripts/simplify_fraction.py references/arithmetic.md
-git commit -m "experiment(skill): add fraction simplifier tool"
-# ✓ One change: "add fraction simplifier" — same intent across files
+# Iteration 1: Enable Docker layer caching (2 files, one intent)
+git add Dockerfile .github/workflows/ci.yml
+git commit -m "experiment(ci): enable Docker layer caching"
+# ✓ One change: "enable caching" — same intent across files
 
-# Iteration 2: Expand a single geometry reference (1 file)
-git add references/geometry.md
-git commit -m "experiment(skill): add triangle area edge cases"
-# ✓ One change: "add triangle area edge cases"
+# Iteration 2: Parallelize test jobs (1 file)
+git add .github/workflows/ci.yml
+git commit -m "experiment(ci): parallelize tests with matrix strategy"
+# ✓ One change: "parallelize tests"
 ```
 
 ### Enforcing Atomicity — Self-Check
@@ -320,10 +391,10 @@ fi
 Configure how strictly the agent enforces the one-change-per-iteration rule:
 
 ```
-$autoresearch
-Goal: Improve Gemma 3 math task score by optimizing the math skill
-Scope: SKILL.md, references/**, scripts/**, assets/**
-Verify: ./tests/verify-metric.sh
+/autoresearch
+Goal: Optimize API response time
+Scope: src/api/**/*.ts
+Verify: wrk -t2 -c10 -d10s http://localhost:3000 | grep 'Avg Lat' | awk '{print $2}'
 Atomicity: strict       # enforce one-change rule (default)
 Max-Files-Per-Change: 3  # alert if >3 files modified in one iteration
 ```
@@ -339,11 +410,11 @@ Max-Files-Per-Change: 3  # alert if >3 files modified in one iteration
 
 ```bash
 # Step 1: Before making any change, write the description
-DESCRIPTION="add fraction simplifier tool"
+DESCRIPTION="add response caching to /api/users endpoint"
 # Test: Can this be said in ONE sentence without "and"? → Yes ✓
 
 # Step 2: Make the change (modify files)
-# ... edit scripts/simplify_fraction.py and references/arithmetic.md ...
+# ... edit src/api/users.ts ...
 
 # Step 3: Validate atomicity before committing
 FILES_CHANGED=$(git diff --name-only | wc -l | tr -d ' ')
@@ -364,30 +435,30 @@ echo "$DESCRIPTION" | grep -qE '\band\b.*\b(add|remove|change|update|fix)\b' && 
 
 # Step 5: Commit only if atomicity validated
 git add <specific-files>
-git commit -m "experiment(skill): ${DESCRIPTION}"
+git commit -m "experiment(api): ${DESCRIPTION}"
 ```
 
 **Examples of atomicity enforcement:**
 
 ```
 # ✓ ATOMIC — passes all checks:
-Description: "add arithmetic word-problem reference"
-Files changed: 1 (references/arithmetic.md)
+Description: "add response caching to /api/users"
+Files changed: 1 (src/api/users.ts)
 → Commit proceeds
 
 # ✓ ATOMIC — multi-file but single intent:
-Description: "add fraction simplifier tool"
-Files changed: 2 (scripts/simplify_fraction.py, references/arithmetic.md)
+Description: "add Redis caching layer"
+Files changed: 3 (docker-compose.yml, src/cache.ts, src/api/users.ts)
 → Same intent across files, commit proceeds
 
 # ✗ NOT ATOMIC — fails one-sentence test:
-Description: "add calculator tool AND rewrite geometry strategy"
+Description: "add caching AND refactor error handling"
 → Contains "and" linking unrelated actions
-→ Split into: iteration N = "add calculator tool", iteration N+1 = "rewrite geometry strategy"
+→ Split into: iteration N = "add caching", iteration N+1 = "refactor error handling"
 
 # ✗ NOT ATOMIC — too many unrelated files:
-Description: "optimize the skill"
-Files changed: 12 (across SKILL.md, references, scripts, assets)
+Description: "optimize performance"
+Files changed: 12 (across api, db, frontend, config)
 → Too broad — split into focused iterations
 ```
 
@@ -519,7 +590,7 @@ done | sort -n | sed -n '2p'  # median of 3 runs
 
 Configure via inline config:
 ```
-$autoresearch
+/autoresearch
 Verify: npm run benchmark 2>&1 | grep 'avg' | awk '{print $2}'
 Noise: high           # triggers 3-run median automatically
 Noise-Runs: 5         # custom: 5 runs instead of default 3
@@ -729,7 +800,7 @@ ELIF crashed:
 
 ## Phase 7: Log Results
 
-Append to results log (TSV format):
+### 7a — Append to results log (TSV format)
 
 ```
 iteration  commit   metric   status        description
@@ -741,6 +812,60 @@ iteration  commit   metric   status        description
 ```
 
 **Valid statuses:** `keep`, `keep (reworked)`, `discard`, `crash`, `no-op`, `hook-blocked`, `metric-error`
+
+### 7b — Append to experiment action log (NDJSON format)
+
+Immediately after writing the TSV row, append one structured record to `.autoresearch/experiment.jsonl`:
+
+```bash
+# Minimal record (required fields only)
+printf '{"iteration":%s,"timestamp":"%s","status":"%s","commit":"%s","metric":%s,"delta":%s,"guard":"%s","description":"%s"}\n' \
+  "${ITERATION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${STATUS}" "${COMMIT}" \
+  "${METRIC:-null}" "${DELTA:-null}" "${GUARD}" "${DESCRIPTION}" \
+  >> .autoresearch/experiment.jsonl
+```
+
+Optional fields to include when available:
+
+| Field | When to include |
+|-------|-----------------|
+| `guardMetric` | When using a metric-valued guard |
+| `hypothesis` | The agent's reasoning for why this change would work |
+| `filesRead` | Array of files read during Phase 1–3 |
+| `filesModified` | Array of files actually changed in Phase 3 |
+| `toolsUsed` | Array of `{name, input}` objects for every tool call |
+| `verifyOutput` | Last 500 chars of verify stdout/stderr (truncate if longer) |
+| `guardOutput` | Last 500 chars of guard stdout/stderr (truncate if longer) |
+| `durationMs` | Wall-clock time for the entire iteration |
+
+Example full record:
+
+```json
+{
+  "iteration": 3,
+  "timestamp": "2026-05-24T12:10:00Z",
+  "status": "discard",
+  "commit": "-",
+  "metric": 86.5,
+  "delta": -0.6,
+  "guard": "pass",
+  "description": "refactor test helpers (broke 2 tests)",
+  "hypothesis": "centralizing setup reduces duplication",
+  "filesRead": ["src/auth.test.ts", "src/helpers.ts"],
+  "filesModified": ["src/helpers.ts", "src/auth.test.ts"],
+  "toolsUsed": [
+    {"name": "Read", "input": {"file_path": "src/auth.test.ts"}},
+    {"name": "Edit", "input": {"file_path": "src/helpers.ts"}}
+  ],
+  "verifyOutput": "Tests: 48 passed, 2 failed\n FAIL src/auth.test.ts",
+  "durationMs": 42000
+}
+```
+
+**Rules:**
+- Write **both** the TSV row and the NDJSON record for every iteration (including baseline).
+- Write them **immediately** after the keep/discard decision while context is fresh.
+- Do NOT commit `.autoresearch/experiment.jsonl` to git (`.autoresearch/` should be gitignored).
 
 ## Phase 8: Repeat
 
@@ -814,7 +939,7 @@ PRINT "  Best: {best_metric} (iteration #{best_iteration})"
 PRINT "  Current: {current_metric}"
 PRINT "  Last {plateau_patience} iterations: {keeps} keeps, {discards} discards — no net gain"
 
-direct prompting:
+AskUserQuestion:
   question: "The metric has plateaued. How do you want to proceed?"
   header: "Plateau Detected"
   options:
@@ -829,7 +954,7 @@ direct prompting:
 **Configuration:**
 
 ```
-$autoresearch
+/autoresearch
 Goal: Reduce bundle size below 200KB
 Verify: npx esbuild src/index.ts --bundle --minify | wc -c
 Plateau-Patience: 20    # check after 20 iterations without improvement (default: 15)
