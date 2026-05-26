@@ -54,6 +54,16 @@ def test_parse_transcript_fixture():
     assert any(b["type"] in ("tool_use", "text", "thinking") for b in assistant.blocks)
 
 
+def test_conversation_id_for_project(tmp_path: Path) -> None:
+    from backend.app.core.conversations import conversation_id_for_project
+
+    workspace = tmp_path / "repo"
+    task = workspace / "tasks" / "demo"
+    task.mkdir(parents=True)
+    assert conversation_id_for_project(workspace, str(workspace)) == "local"
+    assert conversation_id_for_project(workspace, str(task)) == "tasks/demo/local"
+
+
 def test_discover_conversations_local(tmp_path: Path):
     conv_dir = tmp_path / ".autoresearch"
     conv_dir.mkdir()
