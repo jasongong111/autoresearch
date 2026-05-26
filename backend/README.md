@@ -32,10 +32,11 @@ Open **http://127.0.0.1:3847** in your browser.
 Build and run from the **autoresearch repo root** so the image can watch the workspace (including `tasks/*` projects):
 
 ```bash
+cp .env.example .env   # set CURSOR_API_KEY if using runner=cursor
 docker compose up --build
 ```
 
-Open **http://127.0.0.1:3847**. The compose file mounts the repo at `/workspace` inside the container (read-only). Set `DASHBOARD_WORKSPACE` in `.env` if you want to watch a different host directory.
+Open **http://127.0.0.1:3847**. Compose loads `.env` from the repo root and passes `CURSOR_API_KEY` / `CURSOR_MODEL` into the backend for the Cursor SDK orchestrator runner. The workspace mount is read-write so cursor agents can commit skill changes during autoresearch loops.
 
 ### Plain `docker run`
 
@@ -155,7 +156,7 @@ If the agent writes `.autoresearch/session.json` at loop start, the dashboard sh
 | `GET /api/runs/{id}` | Single run details with session and active status |
 | `GET /api/runs/{id}/iterations` | Normalized iteration rows |
 | `GET /api/runs/{id}/summary` | Aggregates (keeps, discards, stuck warning) |
-| `GET /api/git/commits` | Recent `experiment:` commits |
+| `GET /api/git/commits` | Recent `experiment:` commits (optional `?project_id=tasks/...`) |
 | `GET /api/git/commits/{hash}/stat` | Diff stat for a commit |
 | `GET /api/trace` | Live agent trace events from `.autoresearch/trace.jsonl` |
 | `GET /api/analytics` | Aggregated trace, model cost/usage, score, user, and latency metrics |
@@ -183,6 +184,40 @@ If the agent writes `.autoresearch/session.json` at loop start, the dashboard sh
 | `GET /api/orchestrator/instances/{id}` | Get a run instance |
 | `POST /api/orchestrator/instances/{id}/stop` | Stop a running instance |
 | `GET /api/orchestrator/instances/{id}/logs` | Get stdout/stderr logs |
+
+### Cursor SDK runner
+
+Select **cursor** as the runner in the run configurator (or use `./bin/autoresearch-cursor`). The backend launches a **local Cursor SDK agent** against the project directory — same loop as Claude/Codex, but driven programmatically via `cursor-sdk`.
+
+Requirements:
+
+| Variable | Description |
+|----------|-------------|
+| `CURSOR_API_KEY` | User or service-account key from [Cursor Dashboard → Integrations](https://cursor.com/dashboard/integrations) |
+| `CURSOR_MODEL` | Optional model id (default `composer-2.5`; overridable per run via config `flags.model`) |
+
+Install the SDK dependency:
+
+```bash
+conda activate autoresearch-dashboard
+pip install cursor-sdk
+# or: conda env update -f backend/environment.yml --prune
+```
+
+CLI example (Gemma 3 skill optimization task):
+
+```bash
+export CURSOR_API_KEY="cursor_..."
+./bin/autoresearch-cursor \
+  --project tasks/gemma3-math-skill-optimization \
+  --goal "Improve Gemma 3 math benchmark score" \
+  --scope "skills/**" \
+  --metric "accuracy (higher is better)" \
+  --verify "./tests/verify-metric.sh" \
+  --iterations 5
+```
+
+The agent loads project skills via `LocalAgentOptions(setting_sources=["all"])` and is prompted to follow `.agents/skills/autoresearch/SKILL.md`.
 
 ## Tests
 
