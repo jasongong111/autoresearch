@@ -4,6 +4,7 @@ export interface Project {
   name: string;
   runCount: number;
   isTask: boolean;
+  gitRoot?: string | null;
 }
 
 export interface Run {
@@ -48,6 +49,7 @@ export interface GitCommit {
   shortHash: string;
   message: string;
   date: string;
+  projectId?: string;
 }
 
 export interface Session {
@@ -195,6 +197,16 @@ export interface ConversationTurn {
   blocks: ContentBlock[];
 }
 
+export interface SkillDoc {
+  id: string;
+  path: string;
+  name: string;
+  category: string;
+  source: string;
+  lastModified: number;
+  size: number;
+}
+
 export interface RunConfig {
   id: string;
   name: string;
@@ -223,4 +235,27 @@ export interface RunInstance {
   exit_code?: number;
   stdout_tail: string[];
   stderr_tail: string[];
+  project_path?: string;
+  conversation_id?: string | null;
+  cursor_agent_id?: string | null;
+}
+
+export interface ExperimentRecord {
+  iteration: number;
+  timestamp: string;
+  status: string;
+  commit: string;
+  metric: number | null;
+  delta: number | null;
+  guard: string;
+  guardMetric?: number | null;
+  description: string;
+  hypothesis?: string;
+  filesRead?: string[];
+  filesModified?: string[];
+  toolsUsed?: { name: string; input: Record<string, unknown> }[];
+  verifyOutput?: string;
+  guardOutput?: string;
+  durationMs?: number;
+  [key: string]: unknown;
 }
