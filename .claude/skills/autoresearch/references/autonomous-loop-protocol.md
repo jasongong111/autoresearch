@@ -55,15 +55,30 @@ GUARD_BASELINE=$(<guard command>)
 
 ## Phase 1: Review (30 seconds)
 
-Before each iteration, build situational awareness. **You MUST complete ALL 6 steps — git history is critical for learning from past iterations.**
+Before each iteration, build situational awareness. **You MUST complete ALL 7 steps — git history and your own logs from the last round are critical for learning from past iterations.**
 
 ```
 1. Read current state of in-scope files (full context)
-2. Read last 10-20 entries from results log
-3. MUST run: git log --oneline -20 to see recent changes
-4. MUST run: git diff HEAD~1 (if last iteration was "keep") to review what worked
-5. Identify: what worked, what failed, what's untried — based on BOTH results log AND git history
-6. If bounded: check current_iteration vs max_iterations
+2. Read last 10-20 entries from autoresearch-results.tsv (the results log you wrote in prior rounds)
+3. Read the most recent record from .autoresearch/experiment.jsonl (the action log you wrote last round)
+   — review hypothesis, filesModified, verifyOutput/guardOutput, status, and description
+4. MUST run: git log --oneline -20 to see recent changes
+5. MUST run: git diff HEAD~1 (if last iteration was "keep") to review what worked
+6. Identify: what worked, what failed, what's untried — based on results log, experiment.jsonl, AND git history
+7. If bounded: check current_iteration vs max_iterations
+```
+
+**Why read your logs every time?** The TSV results log records outcomes (metric, delta, keep/discard). The experiment action log records *what you actually did* — hypothesis, files touched, and truncated verify/guard output. Read both before ideating so you do not repeat a failed hypothesis or miss a clue in last round's verify output.
+
+```bash
+# Results log — recent outcomes
+tail -20 autoresearch-results.tsv
+
+# Last round's full action record (required every iteration after baseline)
+tail -1 .autoresearch/experiment.jsonl
+
+# Optional: scan last few rounds for repeating discard/crash patterns
+tail -5 .autoresearch/experiment.jsonl
 ```
 
 **Why read git history every time?** Git IS the memory. After rollbacks, state may differ from what you expect. The git log shows which experiments were kept vs reverted. The git diff of kept changes reveals WHAT specifically improved the metric — use this to inform the next iteration. Never assume — always verify.
@@ -91,6 +106,10 @@ Git as Memory is **always enabled** — it's a core behavior, not optional. The 
 At the start of EVERY iteration (Phase 1), the agent runs:
 
 ```bash
+# Step 0: Read recent outcomes and last round's action log
+tail -20 autoresearch-results.tsv
+tail -1 .autoresearch/experiment.jsonl
+
 # Step 1: Read recent experiment history
 git log --oneline -20
 # Shows: kept commits remain, discarded ones were reverted
@@ -236,19 +255,20 @@ $ git commit -m "experiment(model): increase hidden layers from 4 to 6"
 
 ## Phase 2: Ideate (Strategic)
 
-Pick the NEXT change. **MUST consult git history and results log before deciding.**
+Pick the NEXT change. **MUST consult git history, results log, and the last `.autoresearch/experiment.jsonl` record before deciding.**
 
 **How to use git as memory:**
 - Run `git log --oneline -10` — read commit messages to see what was tried
 - For each "keep" in results log, run `git show <commit-hash> --stat` to see what files/patterns worked
 - For discarded approaches, read the commit message to understand what was attempted and avoid repeating it
+- Read the last experiment.jsonl record — use `verifyOutput`, `hypothesis`, and `filesModified` to explain why the last round failed or succeeded
 - Look for patterns: if 3 commits improved metric by touching file X, focus on file X
 
 **Priority order:**
 
 1. **Fix crashes/failures** from previous iteration first
 2. **Exploit successes** — run `git diff` on last kept commit, try variants in same direction
-3. **Explore new approaches** — cross-reference results log AND git history to find untried approaches
+3. **Explore new approaches** — cross-reference results log, experiment.jsonl, AND git history to find untried approaches
 4. **Combine near-misses** — two changes that individually didn't help might work together
 5. **Simplify** — remove code while maintaining metric. Simpler = better
 6. **Radical experiments** — when incremental changes stall, try something dramatically different
@@ -266,6 +286,64 @@ Pick the NEXT change. **MUST consult git history and results log before deciding
 - Make ONE focused change to in-scope files
 - The change should be explainable in one sentence
 - Write the description BEFORE making the change (forces clarity)
+
+### Three-Level Skill Optimization Policy
+
+When optimizing an agent skill package, progress through these levels gradually. Start at the lowest level that directly addresses the failure evidence from Phase 1-2. Do not skip to a higher level just because it is more interesting, but also do not park on the same level indefinitely.
+
+**No level parking:** Do not spend more than 3 consecutive iterations at the same level without either a kept improvement or an explicit escalation. If two attempts at the same level crash, produce no diff, or are discarded for the same reason, escalate on the next iteration. Record the level in the experiment description, for example: `level 1: add answer-normalizer script`.
+
+#### Level 1: Outsource Procedural Tasks to Deterministic Code (`skills/<name>/scripts/`)
+
+Use Level 1 when the skill relies on prose to perform strict algorithmic work, such as parsing files, validating JSON, normalizing answers, checking directory layouts, or running sequential calculations. Text instructions for these tasks eventually hallucinate, skip steps, or apply rules inconsistently.
+
+**Action:** Identify the deterministic part of the workflow. Write a Python, Node, or Bash script under `skills/<name>/scripts/`, then replace the long prose procedure in `SKILL.md` with a short command contract.
+
+**Before (text-based):**
+```markdown
+Look at the directory structure. Check if every folder has an index file. If a folder is missing one, list it out...
+```
+
+**After (script-based):**
+```markdown
+Run `python3 skills/<name>/scripts/audit_layout.py`. If the exit code is non-zero, parse the printed JSON error array and present it to the user.
+```
+
+Level 1 changes are preferred before adding more prompt text whenever the failure is procedural and mechanically checkable.
+
+#### Level 2: Implement Progressive Disclosure (`skills/<name>/references/`)
+
+Use Level 2 when `SKILL.md` is getting bloated with edge cases, lookup tables, formatting rules, domain FAQs, or long background explanations. The main skill should route behavior; heavy details should load only when needed.
+
+**Action:** Move non-essential documentation into `skills/<name>/references/`, then add conditional gates in `SKILL.md` that say exactly when to read each reference and when not to.
+
+```markdown
+## Error Handling
+If the linting script fails with a formatting error, read `references/STYLE_GUIDE.md`
+to understand whitespace policies before suggesting a fix. Otherwise, do not read it.
+```
+
+Level 2 changes should reduce core prompt load while preserving retrieval precision.
+
+#### Level 3: Bind Explicit Tooling and Define a Strict Exit Protocol
+
+Use Level 3 when the agent is guessing which tool or command to use, looping over command variants, or failing to know when the skill is complete.
+
+**Action:** Bind each step to the environment's concrete capabilities (shell commands, scripts, native tools, or MCP endpoints when available), and end the workflow with an unambiguous Definition of Done.
+
+**Tool binding example:**
+```markdown
+Use the filesystem tool to write the output to `build.log`. Do not stream the full log back into chat.
+```
+
+**Exit protocol example:**
+```markdown
+The skill is complete only when `python3 scripts/verify.py` returns `status: 0`.
+If you hit three consecutive non-zero returns, halt immediately, print the exact logs,
+and yield control back to the user.
+```
+
+Level 3 changes should eliminate tool ambiguity and define hard stop conditions. Use this level after Level 1-2 have not stabilized execution, or when Phase 1 logs show repeated loops caused by unclear tooling or unclear completion criteria.
 
 ### Multi-File Atomic Changes
 
@@ -722,7 +800,7 @@ ELIF crashed:
 
 ## Phase 7: Log Results
 
-Append to results log (TSV format):
+### 7a — Append to results log (TSV format)
 
 ```
 iteration  commit   metric   status        description
@@ -734,6 +812,60 @@ iteration  commit   metric   status        description
 ```
 
 **Valid statuses:** `keep`, `keep (reworked)`, `discard`, `crash`, `no-op`, `hook-blocked`, `metric-error`
+
+### 7b — Append to experiment action log (NDJSON format)
+
+Immediately after writing the TSV row, append one structured record to `.autoresearch/experiment.jsonl`:
+
+```bash
+# Minimal record (required fields only)
+printf '{"iteration":%s,"timestamp":"%s","status":"%s","commit":"%s","metric":%s,"delta":%s,"guard":"%s","description":"%s"}\n' \
+  "${ITERATION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${STATUS}" "${COMMIT}" \
+  "${METRIC:-null}" "${DELTA:-null}" "${GUARD}" "${DESCRIPTION}" \
+  >> .autoresearch/experiment.jsonl
+```
+
+Optional fields to include when available:
+
+| Field | When to include |
+|-------|-----------------|
+| `guardMetric` | When using a metric-valued guard |
+| `hypothesis` | The agent's reasoning for why this change would work |
+| `filesRead` | Array of files read during Phase 1–3 |
+| `filesModified` | Array of files actually changed in Phase 3 |
+| `toolsUsed` | Array of `{name, input}` objects for every tool call |
+| `verifyOutput` | Last 500 chars of verify stdout/stderr (truncate if longer) |
+| `guardOutput` | Last 500 chars of guard stdout/stderr (truncate if longer) |
+| `durationMs` | Wall-clock time for the entire iteration |
+
+Example full record:
+
+```json
+{
+  "iteration": 3,
+  "timestamp": "2026-05-24T12:10:00Z",
+  "status": "discard",
+  "commit": "-",
+  "metric": 86.5,
+  "delta": -0.6,
+  "guard": "pass",
+  "description": "refactor test helpers (broke 2 tests)",
+  "hypothesis": "centralizing setup reduces duplication",
+  "filesRead": ["src/auth.test.ts", "src/helpers.ts"],
+  "filesModified": ["src/helpers.ts", "src/auth.test.ts"],
+  "toolsUsed": [
+    {"name": "Read", "input": {"file_path": "src/auth.test.ts"}},
+    {"name": "Edit", "input": {"file_path": "src/helpers.ts"}}
+  ],
+  "verifyOutput": "Tests: 48 passed, 2 failed\n FAIL src/auth.test.ts",
+  "durationMs": 42000
+}
+```
+
+**Rules:**
+- Write **both** the TSV row and the NDJSON record for every iteration (including baseline).
+- Write them **immediately** after the keep/discard decision while context is fresh.
+- Do NOT commit `.autoresearch/experiment.jsonl` to git (`.autoresearch/` should be gitignored).
 
 ## Phase 8: Repeat
 
