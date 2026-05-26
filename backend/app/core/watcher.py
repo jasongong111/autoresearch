@@ -29,7 +29,7 @@ class LogFileHandler(FileSystemEventHandler):
         rel = self._rel_path(path)
         if not rel:
             return
-        if rel.endswith(".tsv") or rel.endswith("session.json") or rel.endswith("trace.jsonl"):
+        if rel.endswith(".tsv") or rel.endswith("session.json") or rel.endswith("trace.jsonl") or rel.endswith("experiment.jsonl"):
             if rel.endswith("session.json"):
                 self.state.refresh_runs()
                 return
@@ -41,6 +41,9 @@ class LogFileHandler(FileSystemEventHandler):
                 return
             if rel.endswith("trace.jsonl"):
                 self.state.on_trace_changed()
+                return
+            if rel.endswith("experiment.jsonl"):
+                self.state.on_experiment_changed()
                 return
             self.state.on_file_changed(rel)
             return
