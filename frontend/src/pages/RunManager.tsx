@@ -41,9 +41,9 @@ export default function RunManager() {
   const config = configs.find((c) => c.id === instance?.config_id);
 
   return (
-    <div>
+    <div className="dashboard-page">
       <header className="page-header">
-        <div className="page-header-row top">
+        <div className="page-header-row bottom">
           <h1 className="page-title">Run Manager</h1>
           <div className="page-header-spacer" />
           <button type="button" className="btn btn-secondary" onClick={() => refresh()}>
@@ -57,13 +57,14 @@ export default function RunManager() {
         </div>
       </header>
 
+      <div className="page-body">
       {loading && instances.length === 0 ? (
         <div className="loading-grid">
           <div className="skeleton" />
           <div className="skeleton" />
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div className="runs-grid">
           <div className="panel">
             <div className="panel-header">
               <h2 className="panel-title">Instances</h2>
@@ -188,7 +189,7 @@ export default function RunManager() {
       )}
 
       {instance && (
-        <div className="panel" style={{ marginTop: 16 }}>
+        <div className="panel panel-spaced">
           <div className="panel-header">
             <h2 className="panel-title">Logs — {config?.name ?? instance.config_id}</h2>
             <span className="badge outline">{instance.stdout_tail.length + instance.stderr_tail.length} lines</span>
@@ -222,6 +223,7 @@ export default function RunManager() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
