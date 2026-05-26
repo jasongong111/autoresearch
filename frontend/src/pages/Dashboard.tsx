@@ -2,29 +2,35 @@ import { useState } from "react";
 import {
   GitBranch,
   BarChart3,
+  BookOpen,
   LayoutDashboard,
   MessageSquare,
   RefreshCw,
   ScrollText,
   Table2,
+  FlaskConical,
 } from "lucide-react";
 import { useDashboard } from "../hooks/useDashboard";
 import AgentTrace from "../components/AgentTrace";
 import Analytics from "../components/Analytics";
 import ConversationView from "../components/ConversationView";
+import ExperimentsView from "../components/ExperimentsView";
 import GitTimeline from "../components/GitTimeline";
 import IterationTable from "../components/IterationTable";
 import MetricChart from "../components/MetricChart";
+import SkillsView from "../components/SkillsView";
 
-type Tab = "overview" | "analytics" | "iterations" | "conversation" | "trace" | "git";
+type Tab = "overview" | "analytics" | "iterations" | "experiments" | "conversation" | "trace" | "git" | "skills";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "iterations", label: "Iterations", icon: Table2 },
+  { id: "experiments", label: "Experiments", icon: FlaskConical },
   { id: "conversation", label: "Conversation", icon: MessageSquare },
   { id: "trace", label: "Traces", icon: ScrollText },
   { id: "git", label: "Git", icon: GitBranch },
+  { id: "skills", label: "Skills", icon: BookOpen },
 ];
 
 function shortPath(path: string): string {
@@ -51,12 +57,17 @@ export default function Dashboard() {
     commits,
     traceStreams,
     artifacts,
+    experiments,
+    skills,
     conversations,
     conversationTurns,
     selectedConversationId,
     followLiveConversation,
     conversationUpdating,
-    transcriptDirs,
+    linkedInstanceId,
+    linkedConversationId,
+    pendingConversationId,
+    orchestratorInstances,
     connected,
     loading,
     setFollowLiveConversation,
@@ -106,48 +117,50 @@ export default function Dashboard() {
     switch (activeTab) {
       case "overview":
         return (
-          <>
+          <div className="overview-layout">
             {session?.goal && (
               <div className="goal-banner">
                 <div className="metric-label">Goal</div>
-                {session.goal}
+                <p className="goal-text">{session.goal}</p>
               </div>
             )}
-            <div className="metrics-row">
-              <div className="metric-cell">
-                <div className="metric-label">Iterations</div>
-                <div className="metric-value">{summary?.total ?? selectedRun.rowCount}</div>
+            <dl className="stat-strip" aria-label="Run summary">
+              <div className="stat-item">
+                <dt className="metric-label">Iterations</dt>
+                <dd className="metric-value">{summary?.total ?? selectedRun.rowCount}</dd>
               </div>
-              <div className="metric-cell">
-                <div className="metric-label">Keeps</div>
-                <div className="metric-value">{summary?.outcomes?.success ?? 0}</div>
+              <div className="stat-item">
+                <dt className="metric-label">Keeps</dt>
+                <dd className="metric-value">{summary?.outcomes?.success ?? 0}</dd>
               </div>
-              <div className="metric-cell">
-                <div className="metric-label">Discards</div>
-                <div className="metric-value">{summary?.outcomes?.failure ?? 0}</div>
+              <div className="stat-item">
+                <dt className="metric-label">Discards</dt>
+                <dd className="metric-value">{summary?.outcomes?.failure ?? 0}</dd>
               </div>
-              <div className="metric-cell">
-                <div className="metric-label">Best metric</div>
-                <div className="metric-value">
+              <div className="stat-item">
+                <dt className="metric-label">Best metric</dt>
+                <dd className="metric-value">
                   {summary?.bestPrimaryValue != null ? summary.bestPrimaryValue : "—"}
-                </div>
+                </dd>
               </div>
               {summary?.stuckWarning && (
-                <div className="metric-cell warning">
-                  <div className="metric-label">Stuck</div>
-                  <div className="metric-value">{summary.consecutiveDiscards}+ discards</div>
+                <div className="stat-item warning">
+                  <dt className="metric-label">Stuck</dt>
+                  <dd className="metric-value">{summary.consecutiveDiscards}+ discards</dd>
                 </div>
               )}
-            </div>
-            <div className="panel">
+            </dl>
+            <section className="panel panel-chart" aria-labelledby="progress-heading">
               <div className="panel-header">
-                <h2 className="panel-title">Progress — {selectedRun.command}</h2>
+                <h2 className="panel-title" id="progress-heading">
+                  Progress — {selectedRun.command}
+                </h2>
               </div>
-              <div className="panel-body">
+              <div className="panel-body panel-body-flush">
                 <MetricChart command={selectedRun.command} iterations={iterations} />
               </div>
-            </div>
-          </>
+            </section>
+          </div>
         );
       case "analytics":
         return (
@@ -173,6 +186,18 @@ export default function Dashboard() {
             </div>
           </div>
         );
+      case "experiments":
+        return (
+          <div className="panel">
+            <div className="panel-header">
+              <h2 className="panel-title">Experiments</h2>
+              <span className="badge outline">{experiments.length} records</span>
+            </div>
+            <div className="panel-body">
+              <ExperimentsView experiments={experiments} />
+            </div>
+          </div>
+        );
       case "conversation":
         return (
           <div className="panel">
@@ -188,10 +213,14 @@ export default function Dashboard() {
                 turns={conversationTurns}
                 selectedId={selectedConversationId}
                 onSelect={handleConversationChange}
-                transcriptDirs={transcriptDirs}
                 followLive={followLiveConversation}
                 onFollowLiveChange={setFollowLiveConversation}
                 liveUpdating={conversationUpdating}
+                linkedInstanceId={linkedInstanceId}
+                linkedConversationId={linkedConversationId}
+                pendingConversationId={pendingConversationId}
+                orchestratorInstances={orchestratorInstances}
+                workspaceProject={project}
               />
             </div>
           </div>
@@ -231,11 +260,23 @@ export default function Dashboard() {
             </div>
           </div>
         );
+      case "skills":
+        return (
+          <div className="panel">
+            <div className="panel-header">
+              <h2 className="panel-title">Skill docs</h2>
+              <span className="badge outline">{skills.length} files</span>
+            </div>
+            <div className="panel-body" style={{ padding: 0 }}>
+              <SkillsView skills={skills} />
+            </div>
+          </div>
+        );
     }
   };
 
   return (
-    <>
+    <div className="dashboard-page">
       <header className="page-header">
         <div className="page-header-row top">
           <div className="breadcrumb">
@@ -297,20 +338,22 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="tabs-bar">
-        {TABS.map(({ id, label }) => (
+      <nav className="tabs-bar" aria-label="Dashboard sections">
+        {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
             className={`tab ${activeTab === id ? "active" : ""}`}
             onClick={() => setActiveTab(id)}
+            aria-current={activeTab === id ? "page" : undefined}
           >
-            {label}
+            <Icon size={14} aria-hidden />
+            <span>{label}</span>
           </button>
         ))}
-      </div>
+      </nav>
 
-      {renderContent()}
-    </>
+      <div className="page-body">{renderContent()}</div>
+    </div>
   );
 }
