@@ -1,6 +1,7 @@
 import type {
   ConversationInfo,
   ConversationTurn,
+  ExperimentRecord,
   GitCommit,
   Iteration,
   Project,
@@ -8,6 +9,7 @@ import type {
   RunConfig,
   RunInstance,
   Session,
+  SkillDoc,
   Summary,
   TraceAnalytics,
   TraceArtifact,
@@ -58,8 +60,12 @@ export async function fetchSummary(runId: string): Promise<Summary> {
   return r.json();
 }
 
-export async function fetchGitCommits(): Promise<GitCommit[]> {
-  const r = await fetch(`${API}/git/commits`);
+export async function fetchGitCommits(projectId?: string): Promise<GitCommit[]> {
+  const query =
+    projectId && projectId !== "all"
+      ? `?project_id=${encodeURIComponent(projectId)}`
+      : "";
+  const r = await fetch(`${API}/git/commits${query}`);
   const data = await r.json();
   return data.commits;
 }
@@ -109,6 +115,34 @@ export async function fetchRunArtifacts(runId: string): Promise<TraceArtifact[]>
   if (!r.ok) return [];
   const data = await r.json();
   return data.artifacts ?? [];
+}
+
+export async function fetchExperiments(): Promise<ExperimentRecord[]> {
+  const r = await fetch(`${API}/experiments`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.experiments ?? [];
+}
+
+export async function fetchRunExperiments(runId: string): Promise<ExperimentRecord[]> {
+  const r = await fetch(`${API}/runs/${encodeURI(runId)}/experiments`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.experiments ?? [];
+}
+
+export async function fetchSkills(): Promise<SkillDoc[]> {
+  const r = await fetch(`${API}/skills`);
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.skills ?? [];
+}
+
+export async function fetchSkillContent(docId: string): Promise<string | null> {
+  const r = await fetch(`${API}/skills/${encodeURI(docId)}`);
+  if (!r.ok) return null;
+  const data = await r.json();
+  return data.content ?? null;
 }
 
 export async function fetchConversations(): Promise<{
@@ -223,6 +257,11 @@ export function subscribeEvents(
     iterationCount?: number;
     conversationId?: string;
     instanceId?: string;
+    configId?: string;
+    runner?: string;
+    projectPath?: string;
+    cursorAgentId?: string;
+    cursorRunId?: string;
     status?: string;
     stream?: string;
     line?: string;
