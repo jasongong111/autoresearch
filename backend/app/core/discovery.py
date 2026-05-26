@@ -7,6 +7,7 @@ from typing import List
 
 from backend.app.core.parsers import parse_tsv_rows, read_tsv_metadata
 from backend.app.core.schemas import LOG_SCHEMAS, ProjectInfo, RunInfo, command_from_path
+from backend.app.core.git_ops import resolve_git_root
 
 
 def discover_project_roots(project_root: Path) -> List[Path]:
@@ -32,6 +33,7 @@ def discover_projects(project_root: Path, runs: List[RunInfo]) -> List[ProjectIn
     for scan_root in discover_project_roots(project_root):
         project_id = "." if scan_root == project_root else scan_root.relative_to(project_root).as_posix()
         name = project_root.name if project_id == "." else scan_root.name
+        git_root = resolve_git_root(scan_root)
         projects.append(
             ProjectInfo(
                 project_id=project_id,
@@ -39,6 +41,7 @@ def discover_projects(project_root: Path, runs: List[RunInfo]) -> List[ProjectIn
                 name=name,
                 run_count=run_counts.get(project_id, 0),
                 is_task=project_id.startswith("tasks/"),
+                git_root=str(git_root) if git_root else None,
             )
         )
     return projects
