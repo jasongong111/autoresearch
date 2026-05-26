@@ -9,8 +9,13 @@ import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 
-from backend.app.core.discovery import active_run_id, discover_projects, discover_runs
-from backend.app.core.git_ops import ExperimentCommit, commit_diff_stat, list_experiment_commits
+from backend.app.core.discovery import active_run_id, discover_project_roots, discover_projects, discover_runs
+from backend.app.core.git_ops import (
+    ExperimentCommit,
+    commit_diff_stat,
+    list_experiment_commits,
+    resolve_git_root,
+)
 from backend.app.core.parsers import compute_summary, parse_log_file
 from backend.app.core.schemas import ProjectInfo, RunInfo
 from backend.app.core.conversations import (
@@ -38,6 +43,8 @@ class DashboardState:
         self.iterations_cache: Dict[str, List[dict]] = {}
         self.summary_cache: Dict[str, dict] = {}
         self.git_commits: List[ExperimentCommit] = []
+        self._git_commits_by_project: Dict[str, List[ExperimentCommit]] = {}
+        self._git_roots_by_project: Dict[str, Path] = {}
         self.active_run_id: Optional[str] = None
         self._lock = threading.Lock()
         self._subscribers: Set[asyncio.Queue] = set()
@@ -50,6 +57,8 @@ class DashboardState:
         self._conversations: List[dict] = []
         self._conversation_turns_cache: Dict[str, List[dict]] = {}
         self._conversations_fingerprint: str = ""
+        self._experiments: List[dict] = []
+        self._experiments_mtime: float = 0.0
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
@@ -62,6 +71,7 @@ class DashboardState:
             self.active_run_id = active_run_id(self.runs)
             self._load_session()
             self._load_trace(force=True)
+            self._load_experiments(force=True)
             self._load_conversations(force=True)
 
     def _load_session(self) -> None:
@@ -144,6 +154,70 @@ class DashboardState:
     def invalidate_artifacts(self, run_id: str) -> None:
         with self._lock:
             self._artifacts_cache.pop(run_id, None)
+
+    def _experiment_file_path(self, project_root: Path) -> Path:
+        return project_root / ".autoresearch" / "experiment.jsonl"
+
+    def _load_experiments(self, force: bool = False) -> bool:
+        path = self._experiment_file_path(self.project_root)
+        if not path.is_file():
+            if self._experiments:
+                self._experiments = []
+                self._experiments_mtime = 0.0
+                return True
+            return False
+        mtime = path.stat().st_mtime
+        if not force and mtime == self._experiments_mtime:
+            return False
+        experiments: List[dict] = []
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    obj = json.loads(stripped)
+                    if isinstance(obj, dict):
+                        experiments.append(obj)
+                except json.JSONDecodeError:
+                    continue
+        except OSError:
+            pass
+        self._experiments = experiments
+        self._experiments_mtime = mtime
+        return True
+
+    def get_experiments(self) -> List[dict]:
+        with self._lock:
+            self._load_experiments()
+            return list(self._experiments)
+
+    def get_run_experiments(self, run_id: str) -> List[dict]:
+        path = self._experiment_file_path(self._project_root_for_run(run_id))
+        experiments: List[dict] = []
+        if not path.is_file():
+            return experiments
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    obj = json.loads(stripped)
+                    if isinstance(obj, dict):
+                        experiments.append(obj)
+                except json.JSONDecodeError:
+                    continue
+        except OSError:
+            pass
+        return experiments
+
+    def on_experiment_changed(self) -> None:
+        changed = False
+        with self._lock:
+            changed = self._load_experiments(force=True)
+        if changed:
+            self._schedule_publish({"type": "experiment_updated"})
 
     def _conversation_fingerprint(self) -> str:
         return conversation_sources_fingerprint(self.project_root, self.transcript_dirs)
@@ -244,18 +318,67 @@ class DashboardState:
         now = time.time()
         if not force and now - self._last_git_poll < 5:
             return False
-        commits = list_experiment_commits(self.project_root)
-        changed = [c.short_hash for c in commits] != [c.short_hash for c in self.git_commits]
+
+        by_project: Dict[str, List[ExperimentCommit]] = {}
+        roots_by_project: Dict[str, Path] = {}
+        for scan_root in discover_project_roots(self.project_root):
+            project_id = (
+                "."
+                if scan_root == self.project_root
+                else scan_root.relative_to(self.project_root).as_posix()
+            )
+            by_project[project_id] = list_experiment_commits(
+                scan_root,
+                project_id=project_id,
+            )
+            git_root = resolve_git_root(scan_root)
+            if git_root is not None:
+                roots_by_project[project_id] = git_root
+
+        merged: List[ExperimentCommit] = []
+        seen: set[str] = set()
+        for commits in by_project.values():
+            for commit in commits:
+                if commit.hash in seen:
+                    continue
+                seen.add(commit.hash)
+                merged.append(commit)
+        merged.sort(key=lambda c: c.date, reverse=True)
+
+        previous = [c.short_hash for c in self.git_commits]
+        current = [c.short_hash for c in merged]
+        changed = previous != current
         with self._lock:
-            self.git_commits = commits
+            self._git_commits_by_project = by_project
+            self._git_roots_by_project = roots_by_project
+            self.git_commits = merged
             self._last_git_poll = now
         return changed
 
-    def get_git_commits(self) -> List[dict]:
-        return [c.to_dict() for c in self.git_commits]
+    def get_git_commits(self, project_id: Optional[str] = None) -> List[dict]:
+        with self._lock:
+            if project_id and project_id != "all":
+                commits = self._git_commits_by_project.get(project_id, [])
+                return [c.to_dict() for c in commits]
+            return [c.to_dict() for c in self.git_commits]
 
-    def get_commit_stat(self, commit_hash: str) -> Optional[str]:
-        return commit_diff_stat(self.project_root, commit_hash)
+    def get_commit_stat(self, commit_hash: str, project_id: Optional[str] = None) -> Optional[str]:
+        candidates: List[Path] = []
+        with self._lock:
+            if project_id and project_id != "all":
+                root = self._git_roots_by_project.get(project_id)
+                if root is not None:
+                    candidates.append(root)
+            else:
+                candidates.extend(self._git_roots_by_project.values())
+                if not candidates:
+                    candidates.append(self.project_root)
+
+        for root in candidates:
+            stat = commit_diff_stat(root, commit_hash)
+            if stat:
+                return stat
+        return None
 
     async def publish(self, event: Dict[str, Any]) -> None:
         dead: List[asyncio.Queue] = []
