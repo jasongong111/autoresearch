@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 from backend.app.api.events import EventBus
+from backend.app.core.skills import discover_skills, read_skill_content
 from backend.app.core.state import DashboardState
 from backend.app.orchestrator.manager import RunManager
 from backend.app.orchestrator.models import RunConfig, RunInstance
@@ -110,6 +111,12 @@ def make_runs_router(state: DashboardState) -> APIRouter:
             raise HTTPException(404, f"Run not found: {run_id}")
         return {"artifacts": state.get_run_artifacts(run_id)}
 
+    @router.get("/api/runs/{run_id:path}/experiments")
+    def get_run_experiments(run_id: str) -> dict:
+        if not state.get_run(run_id):
+            raise HTTPException(404, f"Run not found: {run_id}")
+        return {"experiments": state.get_run_experiments(run_id)}
+
     @router.get("/api/trace")
     def get_trace() -> dict:
         state.refresh_runs()
@@ -119,6 +126,11 @@ def make_runs_router(state: DashboardState) -> APIRouter:
     def get_analytics() -> dict:
         state.refresh_runs()
         return state.get_analytics()
+
+    @router.get("/api/experiments")
+    def get_experiments() -> dict:
+        state.refresh_runs()
+        return {"experiments": state.get_experiments()}
 
     return router
 
@@ -150,16 +162,38 @@ def make_git_router(state: DashboardState) -> APIRouter:
     router = APIRouter()
 
     @router.get("/api/git/commits")
-    def git_commits() -> dict:
+    def git_commits(project_id: Optional[str] = None) -> dict:
         state.refresh_git()
-        return {"commits": state.get_git_commits()}
+        return {"commits": state.get_git_commits(project_id)}
 
     @router.get("/api/git/commits/{commit_hash}/stat")
-    def git_commit_stat(commit_hash: str) -> dict:
-        stat = state.get_commit_stat(commit_hash)
+    def git_commit_stat(commit_hash: str, project_id: Optional[str] = None) -> dict:
+        stat = state.get_commit_stat(commit_hash, project_id)
         if stat is None:
             raise HTTPException(404, "Commit not found or git unavailable")
         return {"hash": commit_hash, "stat": stat}
+
+    return router
+
+
+def make_skills_router(state: DashboardState) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/api/skills")
+    def list_skills() -> dict:
+        from backend.app.core.skills import discover_skills
+
+        docs = discover_skills(state.project_root)
+        return {"skills": [d.to_dict() for d in docs]}
+
+    @router.get("/api/skills/{doc_id:path}")
+    def get_skill(doc_id: str) -> dict:
+        from backend.app.core.skills import read_skill_content
+
+        content = read_skill_content(state.project_root, doc_id)
+        if content is None:
+            raise HTTPException(404, f"Skill doc not found: {doc_id}")
+        return {"id": doc_id, "content": content}
 
     return router
 
