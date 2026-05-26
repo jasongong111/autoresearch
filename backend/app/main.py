@@ -25,6 +25,7 @@ from backend.app.api.routes import (
     make_orchestrator_router,
     make_projects_router,
     make_runs_router,
+    make_skills_router,
 )
 from backend.app.core.state import DashboardState
 from backend.app.core.watcher import (
@@ -72,6 +73,7 @@ def create_app(
     app.include_router(make_conversations_router(state))
     app.include_router(make_git_router(state))
     app.include_router(make_events_router(event_bus))
+    app.include_router(make_skills_router(state))
     app.include_router(make_orchestrator_router(run_manager))
 
     if static_dir and static_dir.exists():
@@ -135,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
 
     state._schedule_publish = _publish_via_bus  # type: ignore[method-assign]
 
-    run_manager = RunManager(event_callback=_publish_via_bus)
+    run_manager = RunManager(event_callback=_publish_via_bus, workspace_root=project)
 
     observer = start_watcher(state)
     transcript_observer = start_transcript_watcher(state)
