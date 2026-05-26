@@ -7,14 +7,26 @@ import signal
 import subprocess
 import threading
 import time
+from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from .executor import spawn_run
+from backend.app.core.conversations import conversation_id_for_project
+
+from .cursor_runner import run_cursor_agent
+from .executor import prepare_run_workspace, spawn_run
 from .models import RunConfig, RunInstance
 from .store import OrchestratorStore
 
 TAIL_LINES = 250
+
+
+@dataclass
+class _CursorJob:
+    thread: threading.Thread
+    cancel: threading.Event
+    run_ref: Dict[str, Any] = field(default_factory=dict)
 
 
 class RunManager:
@@ -24,10 +36,13 @@ class RunManager:
         self,
         store: Optional[OrchestratorStore] = None,
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        workspace_root: Optional[Path] = None,
     ) -> None:
         self.store = store or OrchestratorStore()
         self.event_callback = event_callback
+        self.workspace_root = (workspace_root or Path.cwd()).resolve()
         self._processes: Dict[str, subprocess.Popen] = {}
+        self._cursor_jobs: Dict[str, _CursorJob] = {}
         self._lock = threading.Lock()
         self._poll_thread: Optional[threading.Thread] = None
         self._stop_polling = threading.Event()
@@ -65,14 +80,6 @@ class RunManager:
                     continue
 
                 return_code = proc.poll()
-                stdout_data = ""
-                stderr_data = ""
-                try:
-                    # Non-blocking read is not trivial with PIPE; we accumulate via communicate
-                    # For live tail we rely on threading readers, but for polling we just check status.
-                    pass
-                except Exception:
-                    pass
 
                 if return_code is not None:
                     instance.status = "completed" if return_code == 0 else "failed"
@@ -90,7 +97,6 @@ class RunManager:
                         }
                     )
                 else:
-                    # Still running — update stored instance for UI refresh
                     instance.pid = proc.pid
                     self.store.save_instance(instance)
 
@@ -122,10 +128,27 @@ class RunManager:
             config_id=config_id,
             status="running",
             started_at=datetime.utcnow(),
+            project_path=config.project_path,
+            conversation_id=conversation_id_for_project(self.workspace_root, config.project_path),
         )
         self.store.save_instance(instance)
 
         try:
+            if config.runner == "cursor":
+                prepare_run_workspace(config)
+                self._start_cursor_run(instance.id, config)
+                self._publish(
+                    {
+                        "type": "run_started",
+                        "instanceId": instance.id,
+                        "configId": config_id,
+                        "runner": "cursor",
+                        "conversationId": instance.conversation_id,
+                        "projectPath": instance.project_path,
+                    }
+                )
+                return instance
+
             proc = spawn_run(instance, config)
         except Exception as exc:
             instance.status = "failed"
@@ -147,7 +170,6 @@ class RunManager:
             instance.pid = proc.pid
             self.store.save_instance(instance)
 
-        # Start reader threads for live tail
         self._start_readers(instance.id, proc)
 
         self._publish(
@@ -156,57 +178,142 @@ class RunManager:
                 "instanceId": instance.id,
                 "configId": config_id,
                 "pid": proc.pid,
+                "conversationId": instance.conversation_id,
+                "projectPath": instance.project_path,
             }
         )
         return instance
+
+    def _append_output(self, instance_id: str, stream: str, line: str) -> None:
+        instance = self.store.get_instance(instance_id)
+        if instance is None:
+            return
+        tail = instance.stdout_tail if stream == "stdout" else instance.stderr_tail
+        tail.append(line)
+        if len(tail) > TAIL_LINES:
+            tail = tail[-TAIL_LINES:]
+        if stream == "stdout":
+            instance.stdout_tail = tail
+        else:
+            instance.stderr_tail = tail
+        self.store.save_instance(instance)
+        self._publish(
+            {
+                "type": "run_output",
+                "instanceId": instance_id,
+                "stream": stream,
+                "line": line,
+            }
+        )
+
+    def _bind_cursor_conversation(self, instance_id: str, agent_id: str, cursor_run_id: str) -> None:
+        instance = self.store.get_instance(instance_id)
+        if instance is None:
+            return
+        instance.cursor_agent_id = agent_id
+        instance.conversation_id = agent_id
+        self.store.save_instance(instance)
+        self._publish(
+            {
+                "type": "instance_updated",
+                "instanceId": instance_id,
+                "conversationId": agent_id,
+                "cursorAgentId": agent_id,
+                "cursorRunId": cursor_run_id,
+                "status": instance.status,
+            }
+        )
+
+    def _start_cursor_run(self, instance_id: str, config: RunConfig) -> None:
+        cancel = threading.Event()
+        job = _CursorJob(thread=threading.Thread(daemon=True), cancel=cancel)
+
+        def worker() -> None:
+            exit_code, error = run_cursor_agent(
+                config,
+                on_line=lambda stream, line: self._append_output(instance_id, stream, line),
+                cancel_event=cancel,
+                run_ref=job.run_ref,
+                on_agent_started=lambda agent_id, cursor_run_id: self._bind_cursor_conversation(
+                    instance_id, agent_id, cursor_run_id
+                ),
+            )
+            instance = self.store.get_instance(instance_id)
+            if instance is None:
+                return
+
+            if cancel.is_set() and exit_code == 130:
+                instance.status = "stopped"
+            elif exit_code == 0:
+                instance.status = "completed"
+            else:
+                instance.status = "failed"
+                if error:
+                    instance.stderr_tail.append(error)
+                    if len(instance.stderr_tail) > TAIL_LINES:
+                        instance.stderr_tail = instance.stderr_tail[-TAIL_LINES:]
+
+            instance.exit_code = exit_code
+            instance.completed_at = datetime.utcnow()
+            instance.pid = None
+            self.store.save_instance(instance)
+
+            with self._lock:
+                self._cursor_jobs.pop(instance_id, None)
+
+            self._publish(
+                {
+                    "type": "run_updated",
+                    "instanceId": instance_id,
+                    "status": instance.status,
+                    "exitCode": exit_code,
+                    "error": error,
+                }
+            )
+
+        job.thread = threading.Thread(target=worker, daemon=True)
+        with self._lock:
+            self._cursor_jobs[instance_id] = job
+        job.thread.start()
 
     def _start_readers(self, instance_id: str, proc: subprocess.Popen) -> None:
         def read_stdout() -> None:
             if proc.stdout is None:
                 return
             for line in proc.stdout:
-                instance = self.store.get_instance(instance_id)
-                if instance is None:
-                    break
-                instance.stdout_tail.append(line.rstrip("\n"))
-                if len(instance.stdout_tail) > TAIL_LINES:
-                    instance.stdout_tail = instance.stdout_tail[-TAIL_LINES:]
-                self.store.save_instance(instance)
-                self._publish(
-                    {
-                        "type": "run_output",
-                        "instanceId": instance_id,
-                        "stream": "stdout",
-                        "line": line.rstrip("\n"),
-                    }
-                )
+                self._append_output(instance_id, "stdout", line.rstrip("\n"))
 
         def read_stderr() -> None:
             if proc.stderr is None:
                 return
             for line in proc.stderr:
-                instance = self.store.get_instance(instance_id)
-                if instance is None:
-                    break
-                instance.stderr_tail.append(line.rstrip("\n"))
-                if len(instance.stderr_tail) > TAIL_LINES:
-                    instance.stderr_tail = instance.stderr_tail[-TAIL_LINES:]
-                self.store.save_instance(instance)
-                self._publish(
-                    {
-                        "type": "run_output",
-                        "instanceId": instance_id,
-                        "stream": "stderr",
-                        "line": line.rstrip("\n"),
-                    }
-                )
+                self._append_output(instance_id, "stderr", line.rstrip("\n"))
 
         threading.Thread(target=read_stdout, daemon=True).start()
         threading.Thread(target=read_stderr, daemon=True).start()
 
     def stop_run(self, instance_id: str) -> bool:
         with self._lock:
+            cursor_job = self._cursor_jobs.get(instance_id)
             proc = self._processes.get(instance_id)
+
+        if cursor_job is not None:
+            cursor_job.cancel.set()
+            run = cursor_job.run_ref.get("run")
+            if run is not None and run.supports("cancel"):
+                try:
+                    run.cancel()
+                except Exception:
+                    pass
+            instance = self.store.get_instance(instance_id)
+            if instance is not None and instance.status == "running":
+                instance.status = "stopped"
+                instance.completed_at = datetime.utcnow()
+                instance.pid = None
+                self.store.save_instance(instance)
+            self._publish({"type": "run_stopped", "instanceId": instance_id})
+            return True
+
         if proc is None:
             instance = self.store.get_instance(instance_id)
             if instance is not None and instance.status == "running" and instance.pid:
