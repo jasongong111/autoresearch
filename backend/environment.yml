@@ -18,3 +18,4 @@ dependencies:
   - pip
   - pip:
       - uvicorn[standard]>=0.23.0
+      - cursor-sdk>=0.1.0
