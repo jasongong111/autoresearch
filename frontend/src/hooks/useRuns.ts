@@ -10,6 +10,7 @@ import {
   updateConfig,
   validateConfig,
 } from "../api";
+import { setActiveOrchestratorRun } from "../lib/activeRun";
 import type { RunConfig, RunInstance } from "../types";
 
 export function useRuns() {
@@ -66,10 +67,16 @@ export function useRuns() {
   }, []);
 
   const runConfig = useCallback(async (configId: string) => {
+    const config = configs.find((c) => c.id === configId);
     const instance = await startRun(configId);
     setInstances((prev) => [instance, ...prev]);
+    setActiveOrchestratorRun({
+      instanceId: instance.id,
+      conversationId: instance.conversation_id ?? null,
+      projectPath: instance.project_path ?? config?.project_path,
+    });
     return instance;
-  }, []);
+  }, [configs]);
 
   const stopInstance = useCallback(async (instanceId: string) => {
     await stopRun(instanceId);
