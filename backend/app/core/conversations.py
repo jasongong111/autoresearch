@@ -48,6 +48,18 @@ def conversation_file_path(project_root: Path) -> Path:
     return project_root / CONVERSATION_PATH
 
 
+def conversation_id_for_project(workspace_root: Path, project_path: str) -> str:
+    """Stable dashboard conversation id for a project's local JSONL mirror."""
+    workspace_root = workspace_root.resolve()
+    task = Path(project_path).resolve()
+    if task == workspace_root:
+        return "local"
+    try:
+        return f"{task.relative_to(workspace_root).as_posix()}/local"
+    except ValueError:
+        return "local"
+
+
 def cursor_transcripts_dir(project_root: Path) -> Optional[Path]:
     """Guess Cursor agent-transcripts path from project root."""
     resolved = project_root.resolve()
