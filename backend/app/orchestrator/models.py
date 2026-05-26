@@ -22,7 +22,7 @@ class RunConfig(BaseModel):
     direction: Optional[str] = "higher"
     iterations: Optional[int] = None
     flags: dict[str, Any] = Field(default_factory=dict)
-    runner: str = "claude"  # claude | codex | opencode
+    runner: str = "claude"  # claude | codex | opencode | cursor
     project_path: str = "."
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -40,3 +40,6 @@ class RunInstance(BaseModel):
     exit_code: Optional[int] = None
     stdout_tail: list[str] = Field(default_factory=list)
     stderr_tail: list[str] = Field(default_factory=list)
+    project_path: Optional[str] = None
+    conversation_id: Optional[str] = None
+    cursor_agent_id: Optional[str] = None
