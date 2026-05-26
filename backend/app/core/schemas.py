@@ -246,6 +246,7 @@ class ProjectInfo:
     name: str
     run_count: int = 0
     is_task: bool = False
+    git_root: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -254,6 +255,7 @@ class ProjectInfo:
             "name": self.name,
             "runCount": self.run_count,
             "isTask": self.is_task,
+            "gitRoot": self.git_root,
         }
 
 
