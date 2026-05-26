@@ -17,7 +17,7 @@ const COMMANDS = [
   "autoresearch:probe",
 ];
 
-const RUNNERS = ["claude", "codex", "opencode"];
+const RUNNERS = ["claude", "codex", "opencode", "cursor"];
 
 export default function RunConfigurator() {
   const navigate = useNavigate();
@@ -33,6 +33,7 @@ export default function RunConfigurator() {
     direction: "higher",
     iterations: "",
     runner: "claude",
+    cursor_model: "composer-2.5",
     project_path: ".",
   });
   const [validating, setValidating] = useState(false);
@@ -77,6 +78,10 @@ export default function RunConfigurator() {
         iterations: form.iterations ? parseInt(form.iterations, 10) : undefined,
         runner: form.runner,
         project_path: form.project_path,
+        flags:
+          form.runner === "cursor" && form.cursor_model
+            ? { model: form.cursor_model }
+            : undefined,
       });
       if (andRun) {
         await runConfig(config.id);
@@ -88,7 +93,14 @@ export default function RunConfigurator() {
   };
 
   return (
-    <div className="panel" style={{ maxWidth: 720 }}>
+    <div className="dashboard-page">
+      <header className="page-header">
+        <div className="page-header-row bottom">
+          <h1 className="page-title">New run</h1>
+        </div>
+      </header>
+      <div className="page-body page-body-narrow">
+        <div className="panel">
       <div className="panel-header">
         <h2 className="panel-title">New run configuration</h2>
       </div>
@@ -136,6 +148,22 @@ export default function RunConfigurator() {
             </select>
           </div>
         </div>
+
+        {form.runner === "cursor" && (
+          <div>
+            <label className="metric-label">Cursor model</label>
+            <input
+              className="input-default"
+              style={{ width: "100%", fontFamily: "var(--font-mono)" }}
+              value={form.cursor_model}
+              onChange={(e) => update("cursor_model", e.target.value)}
+              placeholder="composer-2.5"
+            />
+            <p style={{ marginTop: 6, fontSize: "0.8rem", color: "var(--muted-fg)" }}>
+              Requires <code>CURSOR_API_KEY</code> in the dashboard server environment.
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="metric-label">Project path</label>
@@ -280,7 +308,9 @@ export default function RunConfigurator() {
             Save & Start
           </button>
         </div>
+        </div>
       </div>
+    </div>
     </div>
   );
 }
