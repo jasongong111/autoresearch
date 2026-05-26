@@ -48,6 +48,7 @@ log_iteration 6 "-" "-" "-" "-" "-" "metric-error" "verify output was 'PASS' —
 ```bash
 # Phase 1 (Review): Read recent entries for pattern recognition
 tail -20 autoresearch-results.tsv
+tail -1 .autoresearch/experiment.jsonl
 
 # Count outcomes for progress tracking
 KEEPS=$(grep -c 'keep' autoresearch-results.tsv || echo 0)
@@ -70,10 +71,10 @@ Where logging fits in the loop lifecycle:
 
 ```
 Phase 0 (Setup):    → CREATE log file, record baseline (iteration 0)
-Phase 1 (Review):   → READ last 10-20 log entries for pattern recognition
+Phase 1 (Review):   → READ last 10-20 TSV rows AND last experiment.jsonl record
 Phase 3-6 (Loop):   → Modify, Commit, Verify, Decide
-Phase 7 (Log):      → APPEND new row after keep/discard/crash decision
-Phase 8 (Repeat):   → Back to Phase 1 (reads updated log)
+Phase 7 (Log):      → APPEND TSV row + experiment.jsonl record after keep/discard/crash decision
+Phase 8 (Repeat):   → Back to Phase 1 (reads updated logs)
 ```
 
 Complete end-to-end example:
@@ -140,13 +141,91 @@ iteration	commit	metric	delta	guard	guard-metric	status	description
 
 **Note:** When guard fails, the metric may have improved but the change is still discarded. The guard column makes this visible in the log. For metric-valued guards, the guard-metric column lets you track drift over time even when individual iterations stay within threshold.
 
+## Experiment Action Log (`experiment.jsonl`)
+
+Append a structured NDJSON record to `.autoresearch/experiment.jsonl` at the end of **every iteration** (including baseline). This file captures *what the agent did* — files read, tools used, hypothesis, and full result — so you can reconstruct the exact agent actions later.
+
+### Schema
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `iteration` | int | Yes | Iteration number (0 for baseline) |
+| `timestamp` | string | Yes | ISO 8601 UTC timestamp |
+| `status` | string | Yes | `baseline`, `keep`, `keep (reworked)`, `discard`, `crash`, `no-op`, `hook-blocked`, `metric-error` |
+| `commit` | string | Yes | Short git hash, or `"-"` if reverted/no-op |
+| `metric` | float \| null | Yes | Metric value, or `null` for no-op/crash/metric-error |
+| `delta` | float \| null | Yes | Change from previous best, or `null` |
+| `guard` | string | Yes | `pass`, `fail`, or `"-"` |
+| `guardMetric` | float \| null | No | Guard-metric value if metric-valued guard is used |
+| `description` | string | Yes | One-sentence description of the change |
+| `hypothesis` | string | No | Why the agent thought this change would work |
+| `filesRead` | string[] | No | Files the agent read during review/ideation |
+| `filesModified` | string[] | No | Files actually modified in this iteration |
+| `toolsUsed` | object[] | No | Tools invoked: `{name, input}` |
+| `verifyOutput` | string | No | Last 500 chars of verify command stdout/stderr |
+| `guardOutput` | string | No | Last 500 chars of guard command stdout/stderr |
+| `durationMs` | int | No | Total iteration duration in milliseconds |
+
+### Minimal record (keep)
+
+```json
+{"iteration":1,"timestamp":"2026-05-24T12:00:00Z","status":"keep","commit":"b2c3d4e","metric":87.1,"delta":1.9,"guard":"pass","description":"add tests for auth middleware edge cases"}
+```
+
+### Full record (discard with context)
+
+```json
+{
+  "iteration": 2,
+  "timestamp": "2026-05-24T12:05:00Z",
+  "status": "discard",
+  "commit": "-",
+  "metric": 86.5,
+  "delta": -0.6,
+  "guard": "pass",
+  "description": "refactor test helpers (broke 2 tests)",
+  "hypothesis": "centralizing test setup will reduce duplication",
+  "filesRead": ["src/auth.test.ts", "src/helpers.ts"],
+  "filesModified": ["src/helpers.ts", "src/auth.test.ts"],
+  "toolsUsed": [
+    {"name": "Read", "input": {"file_path": "src/auth.test.ts"}},
+    {"name": "Edit", "input": {"file_path": "src/helpers.ts"}}
+  ],
+  "verifyOutput": "Tests: 48 passed, 2 failed\n FAIL src/auth.test.ts\n  ● should reject expired token",
+  "durationMs": 42000
+}
+```
+
+### Shell helper
+
+```bash
+log_experiment() {
+  local iteration=$1 status=$2 commit=$3 metric=$4 delta=$5 guard=$6 description=$7
+  local ts
+  ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  mkdir -p .autoresearch
+  printf '{"iteration":%s,"timestamp":"%s","status":"%s","commit":"%s","metric":%s,"delta":%s,"guard":"%s","description":"%s"}\n' \
+    "$iteration" "$ts" "$status" "$commit" "${metric:-null}" "${delta:-null}" "$guard" "$description" \
+    >> .autoresearch/experiment.jsonl
+}
+
+# Usage:
+log_experiment 1 "keep" "b2c3d4e" "87.1" "1.9" "pass" "add auth tests"
+log_experiment 2 "discard" "-" "86.5" "-0.6" "pass" "refactor helpers (broke 2 tests)"
+```
+
+**Rules:**
+- Write the record **immediately after** appending to `autoresearch-results.tsv` (Phase 7).
+- Always write a record, even for `no-op`, `crash`, and `metric-error`.
+- Do NOT commit this file to git (it is already under `.autoresearch/` which should be gitignored).
+
 ## Log Management
 
 - Create at setup (iteration 0 = baseline)
-- Append after EVERY iteration (including crashes)
-- Do NOT commit this file to git (add to .gitignore)
-- Read last 10-20 entries at start of each iteration for context
-- Use to detect patterns: what kind of changes tend to succeed?
+- Append after EVERY iteration (including crashes) — both TSV and `experiment.jsonl`
+- Do NOT commit these files to git (add to `.gitignore`)
+- At Phase 1 (Review): read last 10-20 TSV rows **and** `tail -1 .autoresearch/experiment.jsonl`
+- Use both logs to detect patterns: what kind of changes tend to succeed, and what verify output explained failures?
 
 ## Summary Reporting
 
