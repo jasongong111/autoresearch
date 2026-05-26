@@ -43,7 +43,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
         <div className="sidebar-brand">
           <Activity className="sidebar-brand-icon" size={18} />
-          <span className="sidebar-brand-text">Autoresearch</span>
+          <span className="sidebar-brand-text">Tadremk Skill Research</span>
         </div>
 
         <nav className="sidebar-nav">
@@ -86,7 +86,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="main-area">
-        <main className="page-content">{children}</main>
+        <main className="page-content" id="main-content">
+          {children}
+        </main>
       </div>
     </div>
   );
