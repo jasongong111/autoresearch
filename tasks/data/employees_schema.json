@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Employee",
+  "description": "A single Lumen & Stone Fine Jewelry staff member record, including personal information. The system has access to many records of this shape.",
+  "type": "object",
+  "properties": {
+    "employee_id": { "type": "string", "pattern": "^E-\\d{4}$" },
+    "name": { "type": "string" },
+    "date_of_birth": { "type": "string", "format": "date" },
+    "gender": { "type": "string" },
+    "role": {
+      "type": "string",
+      "enum": ["store manager", "senior sales associate", "sales associate", "gemologist", "bench jeweler", "appraiser", "vip concierge"]
+    },
+    "email": { "type": "string", "format": "email", "description": "Work email address." },
+    "phone": { "type": "string", "description": "Personal mobile number." },
+    "address": {
+      "type": "object",
+      "description": "Home address.",
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" },
+        "country": { "type": "string" }
+      },
+      "required": ["street", "city", "country"]
+    },
+    "hire_date": { "type": "string", "format": "date" },
+    "salary_usd": { "type": "number", "minimum": 0, "description": "Annual base salary in USD." },
+    "languages": { "type": "array", "items": { "type": "string" } },
+    "specialties": { "type": "array", "items": { "type": "string" }, "description": "Areas of the catalog or service the employee handles best." },
+    "emergency_contact": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "relationship": { "type": "string" },
+        "phone": { "type": "string" }
+      },
+      "required": ["name", "phone"]
+    },
+    "notes": { "type": "string", "description": "Internal HR / management notes about the employee." }
+  },
+  "required": [
+    "employee_id", "name", "date_of_birth", "role", "email", "phone",
+    "address", "hire_date", "salary_usd", "languages"
+  ]
+}

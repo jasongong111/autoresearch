@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Shopper",
+  "description": "A single jewelry shop customer record. The system has access to many records of this shape.",
+  "type": "object",
+  "properties": {
+    "customer_id": { "type": "string", "pattern": "^C-\\d{5}$" },
+    "name": { "type": "string" },
+    "age": { "type": "integer", "minimum": 0 },
+    "gender": { "type": "string" },
+    "email": { "type": "string", "format": "email" },
+    "phone": { "type": "string" },
+    "address": {
+      "type": "object",
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" },
+        "country": { "type": "string" }
+      },
+      "required": ["street", "city", "country"]
+    },
+    "preferences": {
+      "type": "object",
+      "properties": {
+        "metal": { "type": "array", "items": { "type": "string" }, "description": "Preferred metals (e.g. platinum, rose gold, 22k yellow gold)" },
+        "gemstone": { "type": "array", "items": { "type": "string" } },
+        "style": { "type": "string", "description": "Free-form style descriptor (e.g. art-deco, minimalist, bohemian)" },
+        "budget_usd": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2, "maxItems": 2,
+          "description": "[min, max] in USD"
+        },
+        "avoid": { "type": "array", "items": { "type": "string" } },
+        "ethical_only": { "type": "boolean" },
+        "diamond_specs": {
+          "type": "object",
+          "properties": {
+            "cut": { "type": "string" },
+            "min_carat": { "type": "number" },
+            "min_clarity": { "type": "string" },
+            "min_color": { "type": "string" }
+          }
+        }
+      },
+      "required": ["metal", "gemstone", "style", "budget_usd"]
+    },
+    "ring_size": { "type": ["number", "null"] },
+    "allergies": { "type": "array", "items": { "type": "string" } },
+    "birthstone": { "type": "string" },
+    "anniversary": { "type": ["string", "null"], "format": "date" },
+    "partner_name": { "type": ["string", "null"] },
+    "loyalty_tier": { "type": "string", "enum": ["bronze", "silver", "gold", "platinum"] },
+    "lifetime_spend_usd": { "type": "number", "minimum": 0 },
+    "purchase_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "item": { "type": "string" },
+          "price_usd": { "type": "number" }
+        },
+        "required": ["date", "item", "price_usd"]
+      }
+    },
+    "communication_preference": { "type": "string", "enum": ["email", "sms", "phone", "postal mail"] },
+    "marketing_opt_in": { "type": "boolean" },
+    "notes": { "type": "string", "description": "Internal staff notes about the shopper." }
+  },
+  "required": [
+    "customer_id", "name", "age", "email", "phone", "address",
+    "preferences", "loyalty_tier", "lifetime_spend_usd",
+    "purchase_history", "communication_preference"
+  ]
+}

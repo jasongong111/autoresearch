@@ -1,0 +1,450 @@
+{
+  "shop": "Lumen & Stone Fine Jewelry",
+  "generated_at": "2026-05-12",
+  "note": "All records below are FICTIONAL test data. Names, phone numbers, emails, and addresses are invented for development purposes only.",
+  "shoppers": [
+    {
+      "customer_id": "C-00001",
+      "name": "Amelia Hartwell",
+      "age": 34,
+      "gender": "female",
+      "email": "amelia.hartwell@example.com",
+      "phone": "+1-555-0142-3387",
+      "address": { "street": "284 Cedar Hollow Ln", "city": "Portland", "state": "OR", "zip": "97214", "country": "USA" },
+      "preferences": {
+        "metal": ["rose gold", "platinum"],
+        "gemstone": ["sapphire", "morganite"],
+        "style": "art-deco",
+        "budget_usd": [1500, 5000],
+        "avoid": ["yellow gold"]
+      },
+      "ring_size": 6.5,
+      "allergies": ["nickel"],
+      "birthstone": "sapphire",
+      "anniversary": "2018-09-21",
+      "partner_name": "Jonas Hartwell",
+      "loyalty_tier": "gold",
+      "lifetime_spend_usd": 12450,
+      "purchase_history": [
+        { "date": "2022-11-14", "item": "rose gold sapphire engagement ring", "price_usd": 4200 },
+        { "date": "2023-12-19", "item": "platinum tennis bracelet", "price_usd": 3100 }
+      ],
+      "communication_preference": "email",
+      "marketing_opt_in": true,
+      "notes": "Prefers private viewing appointments. Hates being upsold."
+    },
+    {
+      "customer_id": "C-00002",
+      "name": "Devon Park",
+      "age": 41,
+      "gender": "male",
+      "email": "devon.park@example.com",
+      "phone": "+1-555-0167-2204",
+      "address": { "street": "12 Larkspur Way Apt 4B", "city": "Brooklyn", "state": "NY", "zip": "11215", "country": "USA" },
+      "preferences": {
+        "metal": ["white gold"],
+        "gemstone": ["diamond"],
+        "style": "minimalist",
+        "budget_usd": [500, 2500]
+      },
+      "ring_size": 10,
+      "allergies": [],
+      "birthstone": "topaz",
+      "anniversary": null,
+      "partner_name": null,
+      "loyalty_tier": "silver",
+      "lifetime_spend_usd": 1840,
+      "purchase_history": [
+        { "date": "2024-02-09", "item": "white gold signet ring", "price_usd": 1840 }
+      ],
+      "communication_preference": "sms",
+      "marketing_opt_in": false,
+      "notes": "Walks in. Decisive shopper. Pays cash."
+    },
+    {
+      "customer_id": "C-00003",
+      "name": "Priya Raghavan",
+      "age": 28,
+      "gender": "female",
+      "email": "p.raghavan@example.com",
+      "phone": "+44-20-7946-0331",
+      "address": { "street": "47 Marlowe Crescent", "city": "London", "state": "Greater London", "zip": "SW6 4QT", "country": "UK" },
+      "preferences": {
+        "metal": ["yellow gold", "22k gold"],
+        "gemstone": ["ruby", "emerald", "pearl"],
+        "style": "heritage / Indian",
+        "budget_usd": [3000, 15000]
+      },
+      "ring_size": 5,
+      "allergies": [],
+      "birthstone": "pearl",
+      "anniversary": "2021-03-04",
+      "partner_name": "Aarav Raghavan",
+      "loyalty_tier": "platinum",
+      "lifetime_spend_usd": 38200,
+      "purchase_history": [
+        { "date": "2023-04-22", "item": "22k yellow gold ruby necklace set", "price_usd": 9800 },
+        { "date": "2024-05-18", "item": "south sea pearl drop earrings", "price_usd": 4400 },
+        { "date": "2025-10-02", "item": "emerald cocktail ring, 22k", "price_usd": 11200 }
+      ],
+      "communication_preference": "phone",
+      "marketing_opt_in": true,
+      "notes": "Buys for festivals (Diwali, Karva Chauth). Ask about commissioned pieces."
+    },
+    {
+      "customer_id": "C-00004",
+      "name": "Marcus Okonkwo",
+      "age": 52,
+      "gender": "male",
+      "email": "m.okonkwo@example.com",
+      "phone": "+1-555-0103-8821",
+      "address": { "street": "1108 Magnolia Pkwy", "city": "Atlanta", "state": "GA", "zip": "30309", "country": "USA" },
+      "preferences": {
+        "metal": ["platinum", "white gold"],
+        "gemstone": ["diamond", "onyx"],
+        "style": "classic",
+        "budget_usd": [5000, 25000]
+      },
+      "ring_size": 11.5,
+      "allergies": [],
+      "birthstone": "ruby",
+      "anniversary": "1998-06-12",
+      "partner_name": "Linnea Okonkwo",
+      "loyalty_tier": "platinum",
+      "lifetime_spend_usd": 64500,
+      "purchase_history": [
+        { "date": "2018-06-10", "item": "platinum diamond eternity band (her)", "price_usd": 14200 },
+        { "date": "2022-12-22", "item": "diamond cufflinks", "price_usd": 6300 },
+        { "date": "2024-06-08", "item": "anniversary tennis bracelet", "price_usd": 28000 }
+      ],
+      "communication_preference": "email",
+      "marketing_opt_in": true,
+      "notes": "Anniversary purchases every 4 years. Surprise gifts — never CC the partner."
+    },
+    {
+      "customer_id": "C-00005",
+      "name": "Yuki Tanaka",
+      "age": 23,
+      "gender": "non-binary",
+      "email": "yuki.tanaka@example.com",
+      "phone": "+81-3-5555-2841",
+      "address": { "street": "2-14-7 Daikanyama", "city": "Tokyo", "state": "Shibuya", "zip": "150-0034", "country": "Japan" },
+      "preferences": {
+        "metal": ["sterling silver", "titanium"],
+        "gemstone": ["lab-grown diamond", "black spinel"],
+        "style": "modern / androgynous",
+        "budget_usd": [200, 1200],
+        "ethical_only": true
+      },
+      "ring_size": 7,
+      "allergies": ["nickel", "copper"],
+      "birthstone": "garnet",
+      "anniversary": null,
+      "partner_name": null,
+      "loyalty_tier": "bronze",
+      "lifetime_spend_usd": 680,
+      "purchase_history": [
+        { "date": "2025-02-11", "item": "titanium ear cuff", "price_usd": 220 },
+        { "date": "2025-08-30", "item": "lab-grown diamond stud (single)", "price_usd": 460 }
+      ],
+      "communication_preference": "email",
+      "marketing_opt_in": true,
+      "notes": "Cares about provenance — always asks about supply chain."
+    },
+    {
+      "customer_id": "C-00006",
+      "name": "Elena Vasquez",
+      "age": 67,
+      "gender": "female",
+      "email": "elena.v@example.com",
+      "phone": "+1-555-0199-4477",
+      "address": { "street": "8 Calle del Sol", "city": "Santa Fe", "state": "NM", "zip": "87501", "country": "USA" },
+      "preferences": {
+        "metal": ["yellow gold", "rose gold"],
+        "gemstone": ["turquoise", "opal"],
+        "style": "southwestern / vintage",
+        "budget_usd": [800, 4000]
+      },
+      "ring_size": 8,
+      "allergies": [],
+      "birthstone": "opal",
+      "anniversary": "1981-10-03",
+      "partner_name": "deceased",
+      "loyalty_tier": "gold",
+      "lifetime_spend_usd": 18900,
+      "purchase_history": [
+        { "date": "2019-10-03", "item": "estate-style turquoise pendant", "price_usd": 2100 },
+        { "date": "2023-05-14", "item": "vintage opal cocktail ring", "price_usd": 3400 }
+      ],
+      "communication_preference": "postal mail",
+      "marketing_opt_in": false,
+      "notes": "Prefers in-store. Bring out the estate tray when she visits."
+    },
+    {
+      "customer_id": "C-00007",
+      "name": "Tomás Beltran",
+      "age": 31,
+      "gender": "male",
+      "email": "tomas.b@example.com",
+      "phone": "+34-91-555-0218",
+      "address": { "street": "Calle de Hortaleza 42, 3°D", "city": "Madrid", "state": "Madrid", "zip": "28004", "country": "Spain" },
+      "preferences": {
+        "metal": ["platinum"],
+        "gemstone": ["diamond"],
+        "style": "contemporary engagement",
+        "budget_usd": [8000, 12000],
+        "diamond_specs": { "cut": "round brilliant", "min_carat": 1.2, "min_clarity": "VS1", "min_color": "G" }
+      },
+      "ring_size": 6,
+      "allergies": [],
+      "birthstone": "diamond",
+      "anniversary": null,
+      "partner_name": "Clara Iglesias",
+      "loyalty_tier": "silver",
+      "lifetime_spend_usd": 0,
+      "purchase_history": [],
+      "communication_preference": "email",
+      "marketing_opt_in": true,
+      "notes": "Active engagement-ring shopper. Proposing Q3 2026. Has detailed specs."
+    },
+    {
+      "customer_id": "C-00008",
+      "name": "Robin Aldridge",
+      "age": 45,
+      "gender": "female",
+      "email": "r.aldridge@example.com",
+      "phone": "+1-555-0188-6612",
+      "address": { "street": "75 Linden Ave", "city": "Minneapolis", "state": "MN", "zip": "55408", "country": "USA" },
+      "preferences": {
+        "metal": ["sterling silver"],
+        "gemstone": ["moonstone", "labradorite", "amethyst"],
+        "style": "bohemian",
+        "budget_usd": [100, 600]
+      },
+      "ring_size": 7.5,
+      "allergies": [],
+      "birthstone": "amethyst",
+      "anniversary": "2010-08-22",
+      "partner_name": "Sasha Aldridge",
+      "loyalty_tier": "silver",
+      "lifetime_spend_usd": 2240,
+      "purchase_history": [
+        { "date": "2023-02-14", "item": "moonstone pendant", "price_usd": 280 },
+        { "date": "2024-08-22", "item": "labradorite ring", "price_usd": 410 },
+        { "date": "2025-08-22", "item": "amethyst earring set", "price_usd": 540 }
+      ],
+      "communication_preference": "email",
+      "marketing_opt_in": true,
+      "notes": "Anniversary purchase every August. Send catalog mid-July."
+    },
+    {
+      "customer_id": "C-00009",
+      "name": "Henrik Lindqvist",
+      "age": 39,
+      "gender": "male",
+      "email": "henrik.l@example.com",
+      "phone": "+46-8-555-0473",
+      "address": { "street": "Götgatan 88, 4tr", "city": "Stockholm", "state": "Stockholm", "zip": "11862", "country": "Sweden" },
+      "preferences": {
+        "metal": ["white gold", "platinum"],
+        "gemstone": ["diamond"],
+        "style": "scandinavian minimalist",
+        "budget_usd": [2000, 8000]
+      },
+      "ring_size": 9.5,
+      "allergies": [],
+      "birthstone": "aquamarine",
+      "anniversary": "2015-07-11",
+      "partner_name": "Maja Lindqvist",
+      "loyalty_tier": "gold",
+      "lifetime_spend_usd": 14800,
+      "purchase_history": [
+        { "date": "2015-06-30", "item": "platinum solitaire engagement ring", "price_usd": 7400 },
+        { "date": "2020-07-11", "item": "matching wedding band pair", "price_usd": 4200 },
+        { "date": "2025-07-11", "item": "diamond pendant", "price_usd": 3200 }
+      ],
+      "communication_preference": "email",
+      "marketing_opt_in": false,
+      "notes": "Quiet shopper, very specific. Hates ornate designs."
+    },
+    {
+      "customer_id": "C-00010",
+      "name": "Asha Mensah",
+      "age": 29,
+      "gender": "female",
+      "email": "asha.m@example.com",
+      "phone": "+1-555-0156-7799",
+      "address": { "street": "412 W Cumberland St", "city": "Chicago", "state": "IL", "zip": "60614", "country": "USA" },
+      "preferences": {
+        "metal": ["yellow gold", "rose gold"],
+        "gemstone": ["citrine", "garnet", "diamond"],
+        "style": "stackable / layered",
+        "budget_usd": [400, 1800]
+      },
+      "ring_size": 6,
+      "allergies": [],
+      "birthstone": "garnet",
+      "anniversary": null,
+      "partner_name": "Devin Mensah",
+      "loyalty_tier": "silver",
+      "lifetime_spend_usd": 5840,
+      "purchase_history": [
+        { "date": "2023-01-15", "item": "rose gold stacking ring set (3)", "price_usd": 1200 },
+        { "date": "2024-01-15", "item": "yellow gold citrine ring", "price_usd": 680 },
+        { "date": "2024-12-10", "item": "garnet huggie hoops", "price_usd": 540 },
+        { "date": "2025-03-08", "item": "diamond station necklace", "price_usd": 3420 }
+      ],
+      "communication_preference": "sms",
+      "marketing_opt_in": true,
+      "notes": "Loves seasonal drops. High repeat rate — every 2-3 months."
+    },
+    {
+      "customer_id": "C-00011",
+      "name": "William Chen",
+      "age": 58,
+      "gender": "male",
+      "email": "wchen@example.com",
+      "phone": "+1-555-0144-1029",
+      "address": { "street": "300 Russian Hill Pl", "city": "San Francisco", "state": "CA", "zip": "94109", "country": "USA" },
+      "preferences": {
+        "metal": ["platinum", "18k yellow gold"],
+        "gemstone": ["jade", "diamond"],
+        "style": "investment / heirloom",
+        "budget_usd": [15000, 80000]
+      },
+      "ring_size": 10.5,
+      "allergies": [],
+      "birthstone": "diamond",
+      "anniversary": "1991-04-02",
+      "partner_name": "Helen Chen",
+      "loyalty_tier": "platinum",
+      "lifetime_spend_usd": 184000,
+      "purchase_history": [
+        { "date": "2019-04-02", "item": "imperial jade pendant (heirloom-grade)", "price_usd": 62000 },
+        { "date": "2022-12-15", "item": "5ct diamond solitaire (for daughter)", "price_usd": 84000 },
+        { "date": "2024-04-02", "item": "platinum diamond riviera necklace", "price_usd": 38000 }
+      ],
+      "communication_preference": "phone",
+      "marketing_opt_in": false,
+      "notes": "VIP. Always serve in private room. Daughter's wedding planning 2026."
+    },
+    {
+      "customer_id": "C-00012",
+      "name": "Sofia Ricci",
+      "age": 36,
+      "gender": "female",
+      "email": "sofia.r@example.com",
+      "phone": "+39-06-555-0291",
+      "address": { "street": "Via dei Coronari 137", "city": "Rome", "state": "Lazio", "zip": "00186", "country": "Italy" },
+      "preferences": {
+        "metal": ["yellow gold", "rose gold"],
+        "gemstone": ["coral", "pearl", "emerald"],
+        "style": "italian classic",
+        "budget_usd": [2000, 10000]
+      },
+      "ring_size": 6,
+      "allergies": ["nickel"],
+      "birthstone": "emerald",
+      "anniversary": "2019-05-25",
+      "partner_name": "Lorenzo Ricci",
+      "loyalty_tier": "gold",
+      "lifetime_spend_usd": 22400,
+      "purchase_history": [
+        { "date": "2019-05-25", "item": "yellow gold emerald engagement ring", "price_usd": 8800 },
+        { "date": "2023-05-25", "item": "Mediterranean coral statement necklace", "price_usd": 6200 }
+      ],
+      "communication_preference": "email",
+      "marketing_opt_in": true,
+      "notes": "Speaks Italian preferred. Travels for shopping."
+    },
+    {
+      "customer_id": "C-00013",
+      "name": "Jamal Whitfield",
+      "age": 26,
+      "gender": "male",
+      "email": "jamal.w@example.com",
+      "phone": "+1-555-0177-3308",
+      "address": { "street": "604 Beale St", "city": "Memphis", "state": "TN", "zip": "38103", "country": "USA" },
+      "preferences": {
+        "metal": ["yellow gold", "white gold"],
+        "gemstone": ["diamond", "black diamond"],
+        "style": "hip-hop / chains",
+        "budget_usd": [1500, 6000]
+      },
+      "ring_size": 11,
+      "allergies": [],
+      "birthstone": "ruby",
+      "anniversary": null,
+      "partner_name": null,
+      "loyalty_tier": "silver",
+      "lifetime_spend_usd": 4200,
+      "purchase_history": [
+        { "date": "2024-09-12", "item": "yellow gold Cuban link chain (8mm)", "price_usd": 2400 },
+        { "date": "2025-06-04", "item": "black diamond pendant", "price_usd": 1800 }
+      ],
+      "communication_preference": "sms",
+      "marketing_opt_in": true,
+      "notes": "Wants matching pinky ring next visit."
+    },
+    {
+      "customer_id": "C-00014",
+      "name": "Margaret Holloway",
+      "age": 72,
+      "gender": "female",
+      "email": "m.holloway@example.com",
+      "phone": "+1-555-0122-9831",
+      "address": { "street": "47 Beacon St Unit 5", "city": "Boston", "state": "MA", "zip": "02108", "country": "USA" },
+      "preferences": {
+        "metal": ["platinum", "white gold"],
+        "gemstone": ["diamond", "pearl"],
+        "style": "Edwardian / antique",
+        "budget_usd": [3000, 20000]
+      },
+      "ring_size": 7,
+      "allergies": [],
+      "birthstone": "pearl",
+      "anniversary": "1976-06-19",
+      "partner_name": "Charles Holloway",
+      "loyalty_tier": "platinum",
+      "lifetime_spend_usd": 89500,
+      "purchase_history": [
+        { "date": "2016-06-19", "item": "40th anniversary diamond brooch", "price_usd": 18400 },
+        { "date": "2021-06-19", "item": "Edwardian pearl choker (estate)", "price_usd": 24000 },
+        { "date": "2024-11-08", "item": "platinum drop earrings", "price_usd": 9800 }
+      ],
+      "communication_preference": "postal mail",
+      "marketing_opt_in": false,
+      "notes": "Estate-piece collector. Phone is hard of hearing — mail or in-person."
+    },
+    {
+      "customer_id": "C-00015",
+      "name": "Reza Karimi",
+      "age": 44,
+      "gender": "male",
+      "email": "r.karimi@example.com",
+      "phone": "+971-4-555-0182",
+      "address": { "street": "Apt 2204, Marina Pinnacle", "city": "Dubai", "state": "Dubai", "zip": "00000", "country": "UAE" },
+      "preferences": {
+        "metal": ["22k yellow gold", "platinum"],
+        "gemstone": ["diamond", "sapphire", "spinel"],
+        "style": "high-jewelry / bespoke",
+        "budget_usd": [20000, 200000]
+      },
+      "ring_size": 9,
+      "allergies": [],
+      "birthstone": "topaz",
+      "anniversary": "2008-11-30",
+      "partner_name": "Layla Karimi",
+      "loyalty_tier": "platinum",
+      "lifetime_spend_usd": 412000,
+      "purchase_history": [
+        { "date": "2020-11-30", "item": "bespoke padparadscha sapphire ring", "price_usd": 88000 },
+        { "date": "2023-02-14", "item": "diamond rivière necklace, 18ct total", "price_usd": 165000 },
+        { "date": "2025-11-30", "item": "matching emerald-cut earrings", "price_usd": 142000 }
+      ],
+      "communication_preference": "phone",
+      "marketing_opt_in": false,
+      "notes": "Top VIP. Private appointments only. Personal concierge: Yasmin."
+    }
+  ]
+}
