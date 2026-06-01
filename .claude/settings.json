@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(autoresearch)",
+      "Bash(./tests/verify-metric.sh)",
+      "Bash(./tests/verify-holdout.sh)",
+      "Bash(sips)",
+      "Bash(python3 *)",
+      "Bash(git add *)",
+      "Bash(git mv *)",
+      "Bash(git revert *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(git commit *)",
+      "Bash(python3 tests/run_benchmark.py --split expected)",
+      "Bash(python3 tests/run_benchmark.py --split holdout)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(rm -f tests/benchmark_log.jsonl)"
+    ]
+  }
+}
