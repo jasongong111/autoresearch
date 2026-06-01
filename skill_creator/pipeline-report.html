@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skill-Creator Pipeline Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #fbbf24;
+      --accent5: #f472b6;
+      --border: #334155;
+      --code-bg: #0b1120;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 3rem 1.5rem;
+      text-align: center;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    header p {
+      color: var(--muted);
+      margin-top: 0.5rem;
+      font-size: 1.1rem;
+    }
+    .meta {
+      display: inline-flex;
+      gap: 1rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .badge {
+      background: rgba(56,189,248,0.1);
+      border: 1px solid rgba(56,189,248,0.25);
+      color: var(--accent);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    nav.toc {
+      position: sticky;
+      top: 0;
+      background: rgba(15,23,42,0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      z-index: 50;
+      padding: 0.75rem 1.5rem;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    nav.toc a {
+      color: var(--muted);
+      text-decoration: none;
+      margin-right: 1.25rem;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    nav.toc a:hover { color: var(--accent); }
+    main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    section {
+      margin-bottom: 3rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+    }
+    section h2 {
+      margin-top: 0;
+      font-size: 1.4rem;
+      color: var(--accent);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+    section h3 {
+      color: var(--accent2);
+      margin-top: 1.5rem;
+    }
+    .mermaid {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+      overflow: auto;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+    @media (min-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+    }
+    .note {
+      background: rgba(56,189,248,0.06);
+      border-left: 3px solid var(--accent);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.92rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--accent2); font-weight: 600; }
+    tr:hover td { background: rgba(255,255,255,0.03); }
+    code {
+      background: var(--code-bg);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85em;
+      color: var(--accent3);
+    }
+    pre code { padding: 0; background: none; color: inherit; }
+    .file-tree {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85rem;
+      line-height: 1.8;
+      color: var(--muted);
+      background: var(--code-bg);
+      padding: 1.25rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .file-tree .dir { color: var(--accent); font-weight: 600; }
+    .file-tree .file { color: var(--text); }
+    .file-tree .comment { color: #64748b; }
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Skill-Creator Pipeline Report</h1>
+    <p>Visual reference for how skill-creator components interact and flow</p>
+    <div class="meta">
+      <span class="badge">14 Diagrams</span>
+      <span class="badge">3 Pipelines</span>
+      <span class="badge">11 Scripts</span>
+      <span class="badge">3 Agent Prompts</span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#overview">Overview</a>
+    <a href="#pipelines">Pipelines</a>
+    <a href="#main-pipeline">Main Pipeline</a>
+    <a href="#desc-opt">Description Optimization</a>
+    <a href="#blind-compare">Blind Comparison</a>
+    <a href="#data-flow">Data Flow</a>
+    <a href="#sequence">Sequence</a>
+    <a href="#state-machines">State Machines</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#dependencies">Dependencies</a>
+    <a href="#directory">Directory</a>
+    <a href="#environments">Environments</a>
+    <a href="#grading-logic">Grading Logic</a>
+    <a href="#component-matrix">Component Matrix</a>
+  </nav>
+
+  <main>
+    <section id="overview">
+      <h2>1. System Overview</h2>
+      <p>A bird's-eye view of how the three pipelines, agents, and scripts relate to one another.</p>
+      <div class="mermaid">
+graph TB
+    subgraph User["User"]
+        U1["Intent / Skill Draft"]
+        U2["Review Feedback"]
+        U3["Trigger Eval Queries"]
+    end
+
+    subgraph Pipelines["Pipelines"]
+        direction TB
+        MP["Main Skill Creation Pipeline"]
+        DO["Description Optimization Pipeline"]
+        BC["Blind Comparison Pipeline"]
+    end
+
+    subgraph Agents["Agent Prompts"]
+        direction TB
+        GR["grader.md"]
+        CO["comparator.md"]
+        AN["analyzer.md"]
+    end
+
+    subgraph Scripts["Core Scripts"]
+        direction TB
+        S1["run_eval.py"]
+        S2["run_loop.py"]
+        S3["improve_description.py"]
+        S4["aggregate_benchmark.py"]
+        S5["generate_report.py"]
+        S6["generate_review.py"]
+        S7["package_skill.py"]
+        S8["quick_validate.py"]
+    end
+
+    U1 --> MP
+    MP --> GR
+    MP --> S4
+    MP --> S6
+    MP --> S7
+    S6 --> U2
+    U2 --> MP
+
+    U3 --> DO
+    DO --> S1
+    DO --> S2
+    DO --> S3
+    S2 --> S5
+
+    MP --> BC
+    BC --> CO
+    BC --> AN
+      </div>
+      <div class="note">
+        The meta-skill (SKILL.md) is the central orchestrator. Scripts are utilities it calls; agents are prompt templates for subagents it spawns.
+      </div>
+    </section>
+
+    <section id="pipelines">
+      <h2>2. Pipeline Relationship Map</h2>
+      <p>How the three pipelines branch from and feed back into one another.</p>
+      <div class="mermaid">
+graph LR
+    START(["Start"])
+    INTENT["Capture Intent"]
+    DRAFT["Write SKILL.md"]
+    TESTS["Create Test Cases"]
+
+    subgraph Main["Main Skill Creation"]
+        M1["Run Evals"]
+        M2["Grade Runs"]
+        M3["Aggregate"]
+        M4["Analyze"]
+        M5["Launch Viewer"]
+        M6["Human Review"]
+        M7["Improve Skill"]
+    end
+
+    subgraph DescOpt["Description Optimization"]
+        D1["Generate Queries"]
+        D2["User Review"]
+        D3["Run Optimization Loop"]
+        D4["Apply Best Description"]
+    end
+
+    subgraph Blind["Blind Comparison"]
+        B1["Run Two Versions"]
+        B2["Compare"]
+        B3["Analyze Why"]
+    end
+
+    START --> INTENT
+    INTENT --> DRAFT
+    DRAFT --> TESTS
+    TESTS --> M1
+    M1 --> M2 --> M3 --> M4 --> M5 --> M6 --> M7
+    M7 -->|"iterate"| M1
+    M7 -->|"done"| PACKAGE["Package Skill"]
+
+    DRAFT -->|"trigger tuning"| D1
+    D1 --> D2 --> D3 --> D4
+    D4 --> DRAFT
+
+    M7 -->|"A/B test"| B1
+    B1 --> B2 --> B3
+    B3 --> M7
+      </div>
+    </section>
+
+    <section id="main-pipeline">
+      <h2>3. Main Skill Creation Pipeline</h2>
+      <p>The full 14-step pipeline from intent capture to packaged skill.</p>
+      <div class="mermaid">
+flowchart TD
+    A["1. Capture Intent"] --> B["2. Write SKILL.md"]
+    B --> C["3. Create Test Cases"]
+    C --> D["4. Run Test Cases"]
+    D --> E["5. Draft Assertions"]
+    E --> F["6. Capture Timing"]
+    F --> G["7. Grade Runs"]
+    G --> H["8. Aggregate Benchmark"]
+    H --> I["9. Analyze Benchmark"]
+    I --> J["10. Launch Eval Viewer"]
+    J --> K["11. Human Review"]
+    K --> L["12. Improve Skill"]
+    L --> M{"13. Satisfied?"}
+    M -->|No| D
+    M -->|Yes| N["14. Package Skill"]
+    N --> END(["End"])
+
+    style A fill:#0b1120,stroke:#38bdf8
+    style D fill:#0b1120,stroke:#a78bfa
+    style G fill:#0b1120,stroke:#f472b6
+    style J fill:#0b1120,stroke:#34d399
+    style N fill:#0b1120,stroke:#fbbf24
+      </div>
+    </section>
+
+    <section id="desc-opt">
+      <h2>4. Description Optimization Pipeline</h2>
+      <p>How the trigger-accuracy loop works with train/test splits.</p>
+      <div class="mermaid">
+flowchart TD
+    A["Generate 20 Trigger Queries"] --> B["User Review in eval_review.html"]
+    B --> C["Export eval_set.json"]
+    C --> D["Split: Train 60% / Test 40%"]
+    D --> E["Iteration 1"]
+    E --> F["Evaluate on all queries<br/>via run_eval.py"]
+    F --> G{"All train pass?"}
+    G -->|Yes| H["Select best by TEST score"]
+    G -->|No| I["improve_description.py"]
+    I --> J["Generate new description"]
+    J --> K{"Max iterations reached?"}
+    K -->|No| E
+    K -->|Yes| H
+    H --> L["Apply to SKILL.md frontmatter"]
+    L --> M(["Done"])
+
+    style E fill:#0b1120,stroke:#38bdf8
+    style F fill:#0b1120,stroke:#a78bfa
+    style I fill:#0b1120,stroke:#f472b6
+    style H fill:#0b1120,stroke:#34d399
+      </div>
+      <div class="note">
+        Test scores are hidden from the improver to prevent overfitting. The best description is always chosen by test performance.
+      </div>
+    </section>
+
+    <section id="blind-compare">
+      <h2>5. Blind Comparison Pipeline</h2>
+      <p>The rigorous A/B testing flow for comparing two skill versions.</p>
+      <div class="mermaid">
+flowchart LR
+    A["Skill A<br/>(new)"] --> C["Run on same evals"]
+    B["Skill B<br/>(old/baseline)"] --> C
+    C --> D["Spawn Blind Comparator<br/>comparator.md"]
+    D --> E["comparison.json"]
+    E --> F["Spawn Post-hoc Analyzer<br/>analyzer.md"]
+    F --> G["analysis.json"]
+    G --> H["Winner identified"]
+    H --> I["Strengths & weaknesses"]
+    I --> J["Actionable improvements"]
+
+    style D fill:#0b1120,stroke:#f472b6
+    style F fill:#0b1120,stroke:#a78bfa
+      </div>
+    </section>
+
+    <section id="data-flow">
+      <h2>6. Data Flow Diagram</h2>
+      <p>Where data originates, transforms, and lands across the system.</p>
+      <div class="mermaid">
+flowchart LR
+    subgraph Inputs["Inputs"]
+        I1["evals/evals.json"]
+        I2["User intent"]
+        I3["Input files"]
+        I4["eval_set.json"]
+    end
+
+    subgraph Processes["Processes"]
+        P1["Subagent execution"]
+        P2["Grader"]
+        P3["aggregate_benchmark.py"]
+        P4["generate_review.py"]
+        P5["improve_description.py"]
+    end
+
+    subgraph Outputs["Outputs"]
+        O1["outputs/ + transcript.md"]
+        O2["grading.json"]
+        O3["benchmark.json + .md"]
+        O4["viewer HTML"]
+        O5["feedback.json"]
+        O6["results.json"]
+        O7["report.html"]
+        O8["skill-name.skill"]
+    end
+
+    I1 --> P1
+    I2 --> P1
+    I3 --> P1
+    I4 --> P5
+    P1 --> O1
+    O1 --> P2
+    P2 --> O2
+    O2 --> P3
+    P3 --> O3
+    O3 --> P4
+    P4 --> O4
+    O4 --> O5
+    O5 --> P1
+    P5 --> O6
+    P5 --> O7
+    P3 --> O8
+      </div>
+    </section>
+
+    <section id="sequence">
+      <h2>7. Sequence Diagram: Single Eval Run</h2>
+      <p>What happens during one evaluation from prompt to grading.</p>
+      <div class="mermaid">
+sequenceDiagram
+    participant M as Meta-Skill
+    participant WS as With-Skill Agent
+    participant BL as Baseline Agent
+    participant G as Grader Agent
+    participant D as Disk
+
+    M->>M: Load eval from evals.json
+    par Parallel Execution
+        M->>WS: Spawn with skill + prompt + files
+        WS->>WS: Execute task
+        WS->>D: Write outputs/ + transcript.md + metrics.json
+    and
+        M->>BL: Spawn without skill + prompt + files
+        BL->>BL: Execute task
+        BL->>D: Write outputs/ + transcript.md + metrics.json
+    end
+    M->>D: Capture timing.json
+    M->>D: Write eval_metadata.json (assertions)
+    M->>G: Spawn grader with outputs + transcript + expectations
+    G->>G: Evaluate each expectation
+    G->>D: Write grading.json (PASS/FAIL + claims)
+    M->>M: Read grading.json
+      </div>
+    </section>
+
+    <section id="state-machines">
+      <h2>8. State Machines</h2>
+      <div class="grid-2">
+        <div>
+          <h3>Optimization Loop State</h3>
+          <div class="mermaid">
+stateDiagram-v2
+    [*] --> Split: Split eval_set
+    Split --> Evaluate: Iteration N
+    Evaluate --> CheckTrain: Score results
+    CheckTrain --> Improve: Train has failures
+    CheckTrain --> SelectBest: All train pass
+    Improve --> Evaluate: New description
+    SelectBest --> Apply: Pick best by test
+    Apply --> [*]
+          </div>
+        </div>
+        <div>
+          <h3>Grading Verdict State</h3>
+          <div class="mermaid">
+stateDiagram-v2
+    [*] --> ReviewEvidence: Read transcript + outputs
+    ReviewEvidence --> CheckGenuine: Evidence exists?
+    CheckGenuine --> PASS: Task genuinely completed
+    CheckGenuine --> FAIL: Superficial / coincidental
+    CheckGenuine --> FAIL: Contradictory evidence
+    CheckGenuine --> FAIL: No evidence
+    PASS --> [*]
+    FAIL --> [*]
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2>9. Component Architecture</h2>
+      <p>Layered view of the skill-creator system.</p>
+      <div class="mermaid">
+graph TB
+    subgraph Layer1["Orchestration Layer"]
+        SKILL["SKILL.md<br/>(Meta-Skill Workflow)"]
+    end
+
+    subgraph Layer2["Agent Layer"]
+        AG1["grader.md"]
+        AG2["comparator.md"]
+        AG3["analyzer.md"]
+    end
+
+    subgraph Layer3["Script Layer"]
+        SC1["run_eval.py"]
+        SC2["run_loop.py"]
+        SC3["improve_description.py"]
+        SC4["aggregate_benchmark.py"]
+        SC5["generate_report.py"]
+        SC6["generate_review.py"]
+        SC7["package_skill.py"]
+        SC8["quick_validate.py"]
+        SC9["utils.py"]
+    end
+
+    subgraph Layer4["Asset Layer"]
+        AS1["eval_review.html"]
+        AS2["viewer.html"]
+    end
+
+    subgraph Layer5["Data Layer"]
+        DA1["evals.json"]
+        DA2["grading.json"]
+        DA3["benchmark.json"]
+        DA4["feedback.json"]
+        DA5["eval_set.json"]
+        DA6["comparison.json"]
+        DA7["analysis.json"]
+    end
+
+    SKILL --> AG1
+    SKILL --> AG2
+    SKILL --> AG3
+    SKILL --> SC4
+    SKILL --> SC6
+    SKILL --> SC7
+
+    AG1 --> DA2
+    AG2 --> DA6
+    AG3 --> DA7
+
+    SC1 --> DA5
+    SC2 --> SC1
+    SC2 --> SC3
+    SC2 --> SC5
+    SC3 --> SKILL
+    SC4 --> DA3
+    SC6 --> AS2
+    SC7 --> DA7
+
+    AS1 --> DA5
+    AS2 --> DA4
+      </div>
+    </section>
+
+    <section id="dependencies">
+      <h2>10. Script Dependency Graph</h2>
+      <p>Which scripts import or call which other scripts/utilities.</p>
+      <div class="mermaid">
+graph LR
+    subgraph Scripts["Scripts"]
+        A["run_loop.py"]
+        B["run_eval.py"]
+        C["improve_description.py"]
+        D["generate_report.py"]
+        E["aggregate_benchmark.py"]
+        F["generate_review.py"]
+        G["package_skill.py"]
+        H["quick_validate.py"]
+        I["utils.py"]
+    end
+
+    A --> B
+    A --> C
+    A --> D
+    C -->|"subprocess"| Claude["claude -p"]
+    B -->|"subprocess"| Claude
+    E -->|"reads"| grading["grading.json files"]
+    F -->|"reads"| outputs["outputs/ directories"]
+    G --> H
+    H --> I
+    A --> I
+    B --> I
+
+    style I fill:#0b1120,stroke:#fbbf24
+    style Claude fill:#0b1120,stroke:#34d399
+      </div>
+    </section>
+
+    <section id="directory">
+      <h2>11. Directory Structure</h2>
+      <p>Physical layout of the skill-creator repository.</p>
+      <div class="file-tree">
+<span class="dir">skill-creator/</span>
+├── <span class="file">SKILL.md</span>                    <span class="comment"># Meta-skill definition</span>
+├── <span class="file">LICENSE.txt</span>                 <span class="comment"># Apache 2.0</span>
+├── <span class="dir">agents/</span>                     <span class="comment"># Subagent prompt templates</span>
+│   ├── <span class="file">grader.md</span>             <span class="comment"># PASS/FAIL grading</span>
+│   ├── <span class="file">comparator.md</span>         <span class="comment"># Blind A/B comparison</span>
+│   └── <span class="file">analyzer.md</span>           <span class="comment"># Post-hoc analysis</span>
+├── <span class="dir">assets/</span>                     <span class="comment"># Static HTML tools</span>
+│   └── <span class="file">eval_review.html</span>      <span class="comment"># Trigger eval editor UI</span>
+├── <span class="dir">eval-viewer/</span>                <span class="comment"># Browser review tool</span>
+│   ├── <span class="file">generate_review.py</span>    <span class="comment"># Server/HTML generator</span>
+│   └── <span class="file">viewer.html</span>           <span class="comment"># Frontend template</span>
+├── <span class="dir">references/</span>                 <span class="comment"># Documentation</span>
+│   └── <span class="file">schemas.md</span>            <span class="comment"># JSON schema definitions</span>
+└── <span class="dir">scripts/</span>                    <span class="comment"># Core Python scripts</span>
+    ├── <span class="file">__init__.py</span>
+    ├── <span class="file">aggregate_benchmark.py</span>
+    ├── <span class="file">generate_report.py</span>
+    ├── <span class="file">improve_description.py</span>
+    ├── <span class="file">package_skill.py</span>
+    ├── <span class="file">quick_validate.py</span>
+    ├── <span class="file">run_eval.py</span>
+    ├── <span class="file">run_loop.py</span>
+    └── <span class="file">utils.py</span>
+      </div>
+    </section>
+
+    <section id="environments">
+      <h2>12. Environment Decision Tree</h2>
+      <p>How execution paths differ across Claude Code, Claude.ai, and Cowork.</p>
+      <div class="mermaid">
+flowchart TD
+    A["Start Skill-Creator"] --> B{"Environment?"}
+    B -->|Claude Code| C["Full Pipeline"]
+    B -->|Claude.ai| D["Limited Pipeline"]
+    B -->|Cowork| E["Headless Pipeline"]
+
+    C --> C1["Subagents allowed"]
+    C --> C2["Browser viewer"]
+    C --> C3["Description optimization"]
+    C --> C4["Parallel baselines"]
+
+    D --> D1["No subagents"]
+    D --> D2["Inline test runs"]
+    D --> D3["Skip baselines"]
+    D --> D4["No browser viewer"]
+
+    E --> E1["Subagents allowed"]
+    E --> E2["--static viewer"]
+    E --> E3["Feedback as file download"]
+
+    style C fill:#0b1120,stroke:#34d399
+    style D fill:#0b1120,stroke:#fbbf24
+    style E fill:#0b1120,stroke:#a78bfa
+      </div>
+    </section>
+
+    <section id="grading-logic">
+      <h2>13. Grading Logic Flow</h2>
+      <p>How the grader agent reaches a verdict for each expectation.</p>
+      <div class="mermaid">
+flowchart TD
+    A["Read transcript.md + outputs/"] --> B{"Evidence exists?"}
+    B -->|No| C["FAIL"]
+    B -->|Yes| D{"Genuine completion?"}
+    D -->|Superficial| C
+    D -->|Coincidental| C
+    D -->|Contradictory| C
+    D -->|Yes| E["PASS"]
+
+    F["Extract implicit claims"] --> G{"Claims verifiable?"}
+    G -->|No| H["FAIL claim"]
+    G -->|Yes| I["PASS claim"]
+
+    style C fill:#0b1120,stroke:#f87171
+    style E fill:#0b1120,stroke:#34d399
+      </div>
+      <div class="note">
+        Burden of proof is on the expectation. If there is any ambiguity, the grader should FAIL rather than guess.
+      </div>
+    </section>
+
+    <section id="component-matrix">
+      <h2>14. Component Interaction Matrix</h2>
+      <p>Tabular view of who talks to whom and what data passes between them.</p>
+      <table>
+        <thead>
+          <tr><th>Source</th><th>Target</th><th>Data / Trigger</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>evals.json</code></td><td><code>eval_metadata.json</code></td><td>Prompt, expected output, input files</td></tr>
+          <tr><td>Subagent execution</td><td><code>outputs/</code></td><td>Output files, transcript, metrics</td></tr>
+          <tr><td>Subagent completion</td><td><code>timing.json</code></td><td>duration_ms, total_tokens</td></tr>
+          <tr><td><code>outputs/</code>, <code>transcript.md</code></td><td>Grader subagent</td><td>Evidence for grading</td></tr>
+          <tr><td>Grader subagent</td><td><code>grading.json</code></td><td>PASS/FAIL per expectation, claims</td></tr>
+          <tr><td><code>grading.json</code> (many)</td><td><code>aggregate_benchmark.py</code></td><td>benchmark.json + benchmark.md</td></tr>
+          <tr><td><code>benchmark.json</code></td><td>Analyzer subagent</td><td>Patterns appended as notes</td></tr>
+          <tr><td><code>benchmark.json</code></td><td><code>generate_review.py</code></td><td>Embedded in viewer HTML</td></tr>
+          <tr><td>User browser</td><td><code>feedback.json</code></td><td>Review feedback</td></tr>
+          <tr><td><code>feedback.json</code></td><td>SKILL.md editor</td><td>Improvement inputs</td></tr>
+          <tr><td><code>eval_set.json</code></td><td><code>run_eval.py</code></td><td>Trigger queries</td></tr>
+          <tr><td><code>run_eval.py</code></td><td><code>run_loop.py</code></td><td>Per-query results</td></tr>
+          <tr><td><code>run_loop.py</code></td><td><code>improve_description.py</code></td><td>Failed/false triggers + history</td></tr>
+          <tr><td><code>improve_description.py</code></td><td><code>claude -p</code></td><td>Prompt for new description</td></tr>
+          <tr><td><code>claude -p</code></td><td><code>run_loop.py</code></td><td>New description</td></tr>
+          <tr><td><code>run_loop.py</code></td><td><code>generate_report.py</code></td><td>History for HTML report</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>15. Parallel Execution Model</h2>
+      <p>How evals and grading are parallelized for speed.</p>
+      <div class="mermaid">
+graph TB
+    subgraph Pool["ProcessPoolExecutor"]
+        direction LR
+        E1["Eval 1"]
+        E2["Eval 2"]
+        E3["Eval 3"]
+        E4["Eval ...N"]
+    end
+
+    subgraph PerEval["Per Eval (Parallel)"]
+        direction TB
+        W1["With-Skill Agent"]
+        B1["Baseline Agent"]
+    end
+
+    subgraph Grading["Grading (Parallel)"]
+        direction LR
+        G1["Grader 1"]
+        G2["Grader 2"]
+        G3["Grader ...N"]
+    end
+
+    E1 --> PerEval
+    E2 --> PerEval
+    E3 --> PerEval
+    E4 --> PerEval
+    PerEval --> Grading
+      </div>
+    </section>
+
+    <section>
+      <h2>16. File Lifecycle in a Workspace</h2>
+      <p>How files evolve through one iteration of the main pipeline.</p>
+      <div class="mermaid">
+graph LR
+    subgraph Iteration["workspace/iteration-N/"]
+        direction TB
+        A["eval-001/"]
+        B["eval-002/"]
+        C["eval-.../"]
+    end
+
+    subgraph PerEvalDir["Per eval directory"]
+        direction TB
+        D["with_skill/outputs/"]
+        E["with_skill/transcript.md"]
+        F["with_skill/metrics.json"]
+        G["without_skill/outputs/"]
+        H["without_skill/transcript.md"]
+        I["grading.json"]
+        J["timing.json"]
+        K["eval_metadata.json"]
+    end
+
+    subgraph Aggregated["Aggregated"]
+        L["benchmark.json"]
+        M["benchmark.md"]
+        N["feedback.json"]
+    end
+
+    A --> PerEvalDir
+    B --> PerEvalDir
+    C --> PerEvalDir
+    PerEvalDir --> Aggregated
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Generated report for skill-creator pipeline &middot; 16 visualizations
+  </footer>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        primaryColor: '#1e293b',
+        primaryTextColor: '#e2e8f0',
+        primaryBorderColor: '#38bdf8',
+        lineColor: '#64748b',
+        secondaryColor: '#0f172a',
+        tertiaryColor: '#0b1120',
+        fontFamily: 'ui-sans-serif, system-ui, sans-serif'
+      },
+      flowchart: {
+        curve: 'basis',
+        padding: 16,
+        nodeSpacing: 40,
+        rankSpacing: 60
+      },
+      sequence: {
+        actorFontSize: 14,
+        noteFontSize: 12,
+        messageFontSize: 13
+      }
+    });
+  </script>
+</body>
+</html>

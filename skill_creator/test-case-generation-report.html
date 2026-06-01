@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Generate Test Cases for a Skill</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Lora:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #faf9f5;
+            --surface: #ffffff;
+            --text: #141413;
+            --text-secondary: #5a5954;
+            --text-muted: #8a8984;
+            --border: #e8e6dc;
+            --accent: #788c5d;
+            --accent-light: #eef2e8;
+            --accent-dark: #5a6b44;
+            --warn: #d97706;
+            --warn-light: #fef3c7;
+            --error: #c44;
+            --error-light: #fceaea;
+            --info: #6a9bcc;
+            --info-light: #f0f6fc;
+            --code-bg: #f5f4f0;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Lora', Georgia, serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Poppins', sans-serif;
+            color: var(--text);
+            margin-top: 2.5em;
+            margin-bottom: 0.6em;
+            line-height: 1.3;
+        }
+
+        h1 { font-size: 2.4rem; font-weight: 700; margin-top: 0; }
+        h2 { font-size: 1.6rem; font-weight: 600; border-bottom: 2px solid var(--border); padding-bottom: 0.3em; }
+        h3 { font-size: 1.2rem; font-weight: 600; color: var(--accent-dark); }
+        h4 { font-size: 1rem; font-weight: 600; margin-top: 1.5em; }
+
+        p { margin: 0.8em 0; }
+
+        a { color: var(--accent-dark); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .lead {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 2em;
+        }
+
+        .badge {
+            display: inline-block;
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 3px 10px;
+            border-radius: 4px;
+            margin-right: 6px;
+        }
+
+        .badge-required { background: var(--accent-light); color: var(--accent-dark); }
+        .badge-optional { background: var(--info-light); color: var(--info); }
+        .badge-script { background: var(--warn-light); color: var(--warn); }
+
+        .callout {
+            background: var(--surface);
+            border-left: 4px solid var(--accent);
+            padding: 16px 20px;
+            margin: 1.5em 0;
+            border-radius: 0 6px 6px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .callout.warn { border-left-color: var(--warn); }
+        .callout.error { border-left-color: var(--error); }
+        .callout.info { border-left-color: var(--info); }
+
+        .callout-title {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.4em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        pre, code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+        }
+
+        code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--text);
+        }
+
+        pre {
+            background: var(--code-bg);
+            padding: 16px 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            line-height: 1.5;
+            border: 1px solid var(--border);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+        }
+
+        .file-path {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            background: var(--code-bg);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.2em 0;
+            font-size: 0.95em;
+            background: var(--surface);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            background: var(--text);
+            color: var(--bg);
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: var(--bg); }
+
+        ol.steps, ul.bullets {
+            padding-left: 1.4em;
+            margin: 0.8em 0;
+        }
+
+        ol.steps li { margin: 0.6em 0; padding-left: 0.4em; }
+        ul.bullets li { margin: 0.4em 0; }
+
+        .schema-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 1.2em 0;
+        }
+
+        .schema-block h4 {
+            margin-top: 0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.95rem;
+        }
+
+        .field-row {
+            display: flex;
+            gap: 12px;
+            align-items: baseline;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .field-row:last-child { border-bottom: none; }
+
+        .field-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            font-weight: 500;
+            color: var(--accent-dark);
+            min-width: 140px;
+        }
+
+        .field-type {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8em;
+            color: var(--text-muted);
+            min-width: 80px;
+        }
+
+        .field-desc { flex: 1; color: var(--text-secondary); font-size: 0.95em; }
+
+        .toc {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin: 2em 0;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+            font-size: 1rem;
+        }
+
+        .toc ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            columns: 2;
+            column-gap: 24px;
+        }
+
+        .toc li { margin: 6px 0; font-size: 0.95em; }
+
+        .agent-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 1em 0;
+        }
+
+        .agent-card h4 {
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .agent-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 0.75rem;
+            color: white;
+        }
+
+        .icon-exec { background: var(--info); }
+        .icon-grade { background: var(--accent); }
+        .icon-compare { background: var(--warn); }
+        .icon-analyze { background: var(--text-secondary); }
+
+        .pipeline-diagram {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 1.5em 0;
+            padding: 16px;
+            background: var(--surface);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.85em;
+        }
+
+        .pipeline-step {
+            background: var(--code-bg);
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .pipeline-arrow { color: var(--text-muted); font-size: 1.2em; }
+
+        footer {
+            margin-top: 4em;
+            padding-top: 2em;
+            border-top: 2px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.9em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>How to Generate Test Cases for a Skill</h1>
+        <p class="lead">
+            This guide covers the complete workflow for creating, running, and evaluating test cases (evals)
+            for AI assistant skills using the <strong>skill-creator</strong> toolkit. Test cases verify that
+            a skill produces correct, high-quality outputs when invoked by an agent.
+        </p>
+
+        <div class="toc">
+            <h3>Table of Contents</h3>
+            <ul>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#eval-schema">The Evals Schema</a></li>
+                <li><a href="#workflow">Step-by-Step Workflow</a></li>
+                <li><a href="#prompts">Writing Good Test Prompts</a></li>
+                <li><a href="#assertions">Writing Good Assertions</a></li>
+                <li><a href="#pipeline">The Evaluation Pipeline</a></li>
+                <li><a href="#scripts">Tools & Scripts</a></li>
+                <li><a href="#benchmarking">Benchmarking & Comparison</a></li>
+                <li><a href="#viewer">Reviewing Results</a></li>
+                <li><a href="#iteration">The Iteration Loop</a></li>
+                <li><a href="#trigger">Trigger Description Optimization</a></li>
+            </ul>
+        </div>
+
+        <h2 id="overview">1. Overview</h2>
+        <p>
+            A <strong>skill</strong> is a reusable instruction set (in <code>SKILL.md</code>) that tells an AI agent
+            how to perform a specialized task. Test cases ensure the skill works as intended across different inputs.
+        </p>
+        <p>
+            The skill-creator evaluation system compares two configurations for each test case:
+        </p>
+        <ul class="bullets">
+            <li><strong>With skill</strong> &mdash; The agent has access to the skill's instructions and bundled resources.</li>
+            <li><strong>Without skill (baseline)</strong> &mdash; The agent receives only the raw user prompt, with no skill guidance.</li>
+        </ul>
+        <p>
+            By comparing these configurations, you can objectively measure whether the skill adds value.
+        </p>
+
+        <div class="callout info">
+            <div class="callout-title">When Test Cases Are Needed</div>
+            Skills with objectively verifiable outputs (file transforms, data extraction, code generation,
+            fixed workflow steps) benefit greatly from test cases. Skills with subjective outputs
+            (writing style, art) are better evaluated qualitatively by a human.
+        </div>
+
+        <h2 id="eval-schema">2. The Evals Schema</h2>
+        <p>
+            Test cases are stored in <span class="file-path">evals/evals.json</span> inside the skill directory.
+        </p>
+
+        <pre><code>{
+  "skill_name": "example-skill",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "User's example prompt",
+      "expected_output": "Description of expected result",
+      "files": ["evals/files/sample1.pdf"],
+      "expectations": [
+        "The output includes X",
+        "The skill used script Y"
+      ]
+    }
+  ]
+}</code></pre>
+
+        <div class="schema-block">
+            <h4>Field Reference</h4>
+            <div class="field-row">
+                <div class="field-name">skill_name</div>
+                <div class="field-type">string</div>
+                <div class="field-desc">Name matching the skill's frontmatter <code>name</code> field.</div>
+            </div>
+            <div class="field-row">
+                <div class="field-name">evals[].id</div>
+                <div class="field-type">integer</div>
+                <div class="field-desc">Unique identifier for the eval.</div>
+            </div>
+            <div class="field-row">
+                <div class="field-name">evals[].prompt</div>
+                <div class="field-type">string</div>
+                <div class="field-desc">The task to execute. Should be realistic and specific.</div>
+            </div>
+            <div class="field-row">
+                <div class="field-name">evals[].expected_output</div>
+                <div class="field-type">string</div>
+                <div class="field-desc">Human-readable description of what success looks like.</div>
+            </div>
+            <div class="field-row">
+                <div class="field-name">evals[].files</div>
+                <div class="field-type">string[]</div>
+                <div class="field-desc">Optional list of input file paths, relative to the skill root.</div>
+            </div>
+            <div class="field-row">
+                <div class="field-name">evals[].expectations</div>
+                <div class="field-type">string[]</div>
+                <div class="field-desc">Verifiable statements used by the grader agent. Add these after drafting the skill.</div>
+            </div>
+        </div>
+
+        <h2 id="workflow">3. Step-by-Step Workflow</h2>
+
+        <h3>Phase 1: Draft the Skill</h3>
+        <ol class="steps">
+            <li>Define what the skill should enable the agent to do.</li>
+            <li>Decide when the skill should trigger (user phrases/contexts).</li>
+            <li>Determine the expected output format.</li>
+            <li>Write the <code>SKILL.md</code> with YAML frontmatter and markdown instructions.</li>
+        </ol>
+
+        <h3>Phase 2: Create Initial Test Prompts</h3>
+        <p>
+            After writing the skill draft, create <strong>2-3 realistic test prompts</strong> &mdash; the kind of thing
+            a real user would actually say. Share them with the user for approval.
+        </p>
+        <p>
+            Save prompts to <span class="file-path">evals/evals.json</span>. <strong>Do not write assertions yet</strong>
+            &mdash; just the prompts and expected output descriptions.
+        </p>
+
+        <h3>Phase 3: Run Test Cases</h3>
+        <p>
+            For each test case, spawn <strong>two subagents simultaneously</strong>:
+        </p>
+        <ul class="bullets">
+            <li>One <strong>with the skill</strong> (reads the skill's <code>SKILL.md</code>)</li>
+            <li>One <strong>without the skill</strong> (raw prompt only, as a baseline)</li>
+        </ul>
+        <p>
+            Launch all runs in the same turn so they finish around the same time. Store results in a workspace
+            directory like <span class="file-path">&lt;skill-name&gt;-workspace/iteration-1/eval-&lt;id&gt;/</span>.
+        </p>
+
+        <h3>Phase 4: Draft Assertions (While Runs Execute)</h3>
+        <p>
+            Don't wait idle. While runs are in progress, draft quantitative assertions for each test case.
+            Good assertions are <strong>objectively verifiable</strong> and have <strong>descriptive names</strong>
+            that read clearly in the benchmark viewer.
+        </p>
+
+        <div class="callout warn">
+            <div class="callout-title">Avoid Subjective Assertions</div>
+            Don't force assertions onto things that need human judgment (e.g., "the design looks good").
+            Use qualitative review for subjective outputs and assertions for objective, checkable criteria.
+        </div>
+
+        <h3>Phase 5: Grade, Aggregate, and Review</h3>
+        <ol class="steps">
+            <li><strong>Grade each run</strong> &mdash; Evaluate assertions against outputs and transcripts. Save to <span class="file-path">grading.json</span>.</li>
+            <li><strong>Aggregate</strong> &mdash; Run <code>scripts.aggregate_benchmark</code> to produce <span class="file-path">benchmark.json</span> with pass rates, timing, and token stats.</li>
+            <li><strong>Analyze</strong> &mdash; Surface patterns hidden by aggregate stats (non-discriminating assertions, flaky evals, tradeoffs).</li>
+            <li><strong>Review</strong> &mdash; Launch the eval viewer so the human can inspect outputs and leave feedback.</li>
+        </ol>
+
+        <h3>Phase 6: Iterate</h3>
+        <p>
+            Read the feedback, improve the skill, and rerun all test cases into a new <code>iteration-&lt;N+1&gt;/</code>
+            directory. Repeat until the user is satisfied or you stop making meaningful progress.
+        </p>
+
+        <h2 id="prompts">4. Writing Good Test Prompts</h2>
+
+        <p>Test prompts should be <strong>realistic, specific, and substantive</strong>. A good prompt:</p>
+        <ul class="bullets">
+            <li>Includes concrete details (file paths, column names, contexts).</li>
+            <li>Uses casual or natural language, not abstract requests.</li>
+            <li>Represents a task complex enough that the agent would benefit from the skill.</li>
+        </ul>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Weak Prompt</th>
+                    <th>Strong Prompt</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>"Format this data"</code></td>
+                    <td><code>"ok so my boss sent me this xlsx file (Q4 sales final FINAL v2.xlsx) and wants me to add a profit margin column. Revenue is in column C and costs are in column D."</code></td>
+                </tr>
+                <tr>
+                    <td><code>"Extract text from PDF"</code></td>
+                    <td><code>"I need to pull the invoice details from /invoices/jan-2024.pdf into a CSV. There are about 50 pages with multiple invoices per page. Each invoice has an ID, date, vendor, and total."</code></td>
+                </tr>
+                <tr>
+                    <td><code>"Create a chart"</code></td>
+                    <td><code>"Can you make a bar chart from the monthly active users in analytics.csv? I want to show the trend from Jan to Dec and highlight the drop in July. Save it as a PNG."</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout">
+            <div class="callout-title">Why Detail Matters</div>
+            Vague prompts don't stress-test the skill. The agent might succeed without using the skill at all,
+            making the eval useless for measuring skill value. Detailed prompts force the agent to engage with
+            the skill's instructions and resources.
+        </div>
+
+        <h2 id="assertions">5. Writing Good Assertions (Expectations)</h2>
+
+        <p>
+            Assertions are the heart of quantitative evaluation. Each assertion is a verifiable statement
+            checked by the grader agent against the execution transcript and output files.
+        </p>
+
+        <h4>Principles of Good Assertions</h4>
+        <ul class="bullets">
+            <li><strong>Objectively verifiable</strong> &mdash; A human or script can check it without opinion.</li>
+            <li><strong>Discriminating</strong> &mdash; It passes when the skill genuinely succeeds and fails when it doesn't.</li>
+            <li><strong>Descriptive</strong> &mdash; The text clearly explains what is being checked.</li>
+            <li><strong>Specific</strong> &mdash; "The output is a valid JSON array" is better than "The output is correct."</li>
+        </ul>
+
+        <h4>Examples by Skill Type</h4>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Skill Domain</th>
+                    <th>Good Assertion</th>
+                    <th>Why It Works</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>PDF Processing</td>
+                    <td>"The output CSV contains columns: invoice_id, date, vendor, total"</td>
+                    <td>Checks structure, not just existence</td>
+                </tr>
+                <tr>
+                    <td>Code Generation</td>
+                    <td>"The generated script handles the edge case where input_file is missing"</td>
+                    <td>Checks behavior, not just presence of code</td>
+                </tr>
+                <tr>
+                    <td>Data Extraction</td>
+                    <td>"The extracted phone numbers match the input document exactly"</td>
+                    <td>Checks correctness, not just presence</td>
+                </tr>
+                <tr>
+                    <td>Document Creation</td>
+                    <td>"The DOCX file uses the company's letterhead template"</td>
+                    <td>Checks that the skill's template was used</td>
+                </tr>
+                <tr>
+                    <td>Form Filling</td>
+                    <td>"All 12 fillable fields in the PDF are populated with non-empty values"</td>
+                    <td>Checks completeness with a specific count</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout error">
+            <div class="callout-title">Common Assertion Anti-Patterns</div>
+            <ul class="bullets">
+                <li><strong>Filename-only checks</strong>: "Output file exists" passes even if the file is empty or wrong.</li>
+                <li><strong>Presence without correctness</strong>: "The output includes the name 'John Smith'" passes if the name appears anywhere, even in the wrong context.</li>
+                <li><strong>Too vague</strong>: "The output looks good" is not objectively verifiable.</li>
+                <li><strong>Non-discriminating</strong>: Assertions that always pass in both skill and baseline configs don't measure skill value.</li>
+            </ul>
+        </div>
+
+        <h2 id="pipeline">6. The Evaluation Pipeline</h2>
+
+        <p>
+            The evaluation process involves four specialized agents, each with a distinct role:
+        </p>
+
+        <div class="pipeline-diagram">
+            <span class="pipeline-step">User Prompt</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-step">Executor</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-step">Grader</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-step">Comparator</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-step">Analyzer</span>
+        </div>
+
+        <div class="agent-card">
+            <h4><span class="agent-icon icon-exec">Ex</span> Executor Agent</h4>
+            <p>
+                Receives the test prompt (with or without the skill) and produces outputs. Saves:
+            </p>
+            <ul class="bullets">
+                <li>Output files to <span class="file-path">outputs/</span></li>
+                <li>Execution transcript to <span class="file-path">transcript.md</span></li>
+                <li>Tool usage metrics to <span class="file-path">metrics.json</span></li>
+                <li>Timing data to <span class="file-path">timing.json</span></li>
+            </ul>
+        </div>
+
+        <div class="agent-card">
+            <h4><span class="agent-icon icon-grade">Gr</span> Grader Agent</h4>
+            <p>
+                Evaluates each assertion against the executor's transcript and outputs. Produces
+                <span class="file-path">grading.json</span> with:
+            </p>
+            <ul class="bullets">
+                <li>Pass/fail verdicts with evidence citations</li>
+                <li>Summary statistics (pass rate, counts)</li>
+                <li>Extracted and verified factual claims</li>
+                <li>User notes summary (uncertainties, workarounds)</li>
+                <li>Eval feedback (suggestions for improving assertions)</li>
+            </ul>
+            <p>
+                The grader also <strong>critiques the evals themselves</strong>, flagging assertions that are
+                trivially satisfied or miss important outcomes.
+            </p>
+        </div>
+
+        <div class="agent-card">
+            <h4><span class="agent-icon icon-compare">Co</span> Blind Comparator Agent</h4>
+            <p>
+                Used for advanced A/B comparisons between two skill versions. Receives outputs labeled A and B
+                (without knowing which is which) and judges quality based on a generated rubric.
+            </p>
+            <p>
+                Scores outputs on content (correctness, completeness, accuracy) and structure
+                (organization, formatting, usability), then determines a winner. This prevents bias toward
+                a particular skill version.
+            </p>
+        </div>
+
+        <div class="agent-card">
+            <h4><span class="agent-icon icon-analyze">An</span> Post-Hoc Analyzer Agent</h4>
+            <p>
+                After a blind comparison, the analyzer "unblinds" the results to understand <em>why</em> the winner won.
+                It compares skills, transcripts, and execution patterns to generate:
+            </p>
+            <ul class="bullets">
+                <li>Winner strengths and loser weaknesses</li>
+                <li>Instruction-following scores</li>
+                <li>Actionable improvement suggestions (prioritized by impact)</li>
+            </ul>
+        </div>
+
+        <h2 id="scripts">7. Tools & Scripts</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Script</th>
+                    <th>Purpose</th>
+                    <th>Key Flags</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="file-path">scripts/quick_validate.py</span></td>
+                    <td>Validate a skill's YAML frontmatter and structure before packaging.</td>
+                    <td><code>&lt;skill-directory&gt;</code></td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">scripts/package_skill.py</span></td>
+                    <td>Package a skill folder into a distributable <code>.skill</code> file (zip).</td>
+                    <td><code>&lt;skill-folder&gt; [output-dir]</code></td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">scripts/aggregate_benchmark.py</span></td>
+                    <td>Aggregate individual run results into <code>benchmark.json</code> with statistics.</td>
+                    <td><code>&lt;benchmark_dir&gt; --skill-name &lt;name&gt;</code></td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">scripts/run_eval.py</span></td>
+                    <td>Test whether a skill description triggers correctly for a set of queries.</td>
+                    <td><code>--eval-set --skill-path --model</code></td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">scripts/run_loop.py</span></td>
+                    <td>Run the eval + improve loop for description optimization automatically.</td>
+                    <td><code>--eval-set --skill-path --model --max-iterations</code></td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">scripts/generate_report.py</span></td>
+                    <td>Generate an HTML report from <code>run_loop.py</code> output.</td>
+                    <td><code>&lt;input.json&gt; -o &lt;output.html&gt;</code></td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">eval-viewer/generate_review.py</span></td>
+                    <td>Serve or generate a static HTML review page for eval outputs.</td>
+                    <td><code>&lt;workspace&gt; --skill-name &lt;name&gt; [--static &lt;path&gt;]</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2 id="benchmarking">8. Benchmarking & Comparison</h2>
+
+        <h3>Benchmark Aggregation</h3>
+        <p>
+            The <code>aggregate_benchmark.py</code> script reads all <code>grading.json</code> files from a workspace
+            and produces:
+        </p>
+        <ul class="bullets">
+            <li><strong>Per-configuration statistics</strong> &mdash; mean, stddev, min, max for pass rate, time, and tokens.</li>
+            <li><strong>Delta</strong> &mdash; Difference between skill and baseline configurations.</li>
+            <li><strong>Per-run details</strong> &mdash; Individual expectation results and notes.</li>
+        </ul>
+
+        <pre><code># Aggregate results from an iteration directory
+python -m scripts.aggregate_benchmark \
+  &lt;workspace&gt;/iteration-1 \
+  --skill-name my-skill \
+  --skill-path /path/to/my-skill</code></pre>
+
+        <h3>Benchmark JSON Schema</h3>
+        <p>
+            The generated <code>benchmark.json</code> contains:
+        </p>
+        <ul class="bullets">
+            <li><code>metadata</code> &mdash; skill name, model, timestamp, eval IDs</li>
+            <li><code>runs[]</code> &mdash; per-run results with pass rates, expectations, notes</li>
+            <li><code>run_summary</code> &mdash; statistical aggregates for each configuration</li>
+            <li><code>notes</code> &mdash; freeform analyst observations</li>
+        </ul>
+
+        <div class="callout info">
+            <div class="callout-title">Analyzer Notes</div>
+            After aggregation, run the analyzer agent to surface patterns aggregate stats hide:
+            assertions that always pass (non-discriminating), high-variance evals (possibly flaky),
+            and time/token tradeoffs. These notes go into the <code>benchmark.json</code> <code>notes</code> field.
+        </div>
+
+        <h2 id="viewer">9. Reviewing Results</h2>
+
+        <p>
+            The <code>generate_review.py</code> script creates an interactive HTML viewer for eval results.
+            It supports two modes:
+        </p>
+
+        <h4>Server Mode (Claude Code)</h4>
+        <pre><code>nohup python eval-viewer/generate_review.py \
+  &lt;workspace&gt;/iteration-1 \
+  --skill-name "my-skill" \
+  --benchmark &lt;workspace&gt;/iteration-1/benchmark.json \
+  &gt; /dev/null 2&gt;&1 &</code></pre>
+        <p>
+            Opens a browser with two tabs: <strong>Outputs</strong> (click through each test case, leave feedback)
+            and <strong>Benchmark</strong> (quantitative comparison with pass rates and timing).
+        </p>
+
+        <h4>Static Mode (Cowork / Headless)</h4>
+        <pre><code>python eval-viewer/generate_review.py \
+  &lt;workspace&gt;/iteration-1 \
+  --skill-name "my-skill" \
+  --benchmark &lt;workspace&gt;/iteration-1/benchmark.json \
+  --static /tmp/eval_review.html</code></pre>
+        <p>
+            Writes a standalone HTML file. Feedback is downloaded as <code>feedback.json</code> when the user
+            clicks "Submit All Reviews."
+        </p>
+
+        <h3>Feedback Format</h3>
+        <pre><code>{
+  "reviews": [
+    {"run_id": "eval-0-with_skill", "feedback": "the chart is missing axis labels"},
+    {"run_id": "eval-1-with_skill", "feedback": ""},
+    {"run_id": "eval-2-with_skill", "feedback": "perfect, love this"}
+  ],
+  "status": "complete"
+}</code></pre>
+        <p>
+            Empty feedback means the user thought it was fine. Focus improvements on test cases with
+            specific complaints.
+        </p>
+
+        <h2 id="iteration">10. The Iteration Loop</h2>
+
+        <p>
+            Skill development is iterative. Each cycle follows this pattern:
+        </p>
+
+        <ol class="steps">
+            <li><strong>Apply improvements</strong> to the skill based on feedback and benchmark analysis.</li>
+            <li><strong>Rerun all test cases</strong> into a new <code>iteration-&lt;N+1&gt;/</code> directory, including baselines.</li>
+            <li><strong>Launch the viewer</strong> with <code>--previous-workspace</code> pointing at the previous iteration for comparison.</li>
+            <li><strong>Wait for human review</strong> and read <code>feedback.json</code>.</li>
+            <li><strong>Repeat</strong> until the user is happy, feedback is all empty, or progress stalls.</li>
+        </ol>
+
+        <h3>Improvement Principles</h3>
+        <ul class="bullets">
+            <li><strong>Generalize from feedback.</strong> Don't overfit to the test cases. If an issue is stubborn, try different metaphors or patterns rather than adding rigid MUST rules.</li>
+            <li><strong>Keep the prompt lean.</strong> Remove instructions that aren't pulling their weight. Read transcripts, not just final outputs.</li>
+            <li><strong>Explain the why.</strong> Modern LLMs have good theory of mind. Explain reasoning instead of relying on heavy-handed rules.</li>
+            <li><strong>Bundle repeated work.</strong> If test transcripts show agents independently writing similar helper scripts, bundle that script into the skill.</li>
+        </ul>
+
+        <h2 id="trigger">11. Trigger Description Optimization</h2>
+
+        <p>
+            The <code>description</code> field in <code>SKILL.md</code> frontmatter is the primary mechanism that
+            determines whether Claude invokes a skill. After creating or improving a skill, you can optimize
+            this description for better triggering accuracy.
+        </p>
+
+        <h3>The Process</h3>
+        <ol class="steps">
+            <li><strong>Generate trigger eval queries</strong> &mdash; Create ~20 realistic queries (8-10 should-trigger, 8-10 should-not-trigger). Save as JSON.</li>
+            <li><strong>Review with user</strong> &mdash; Present via <code>assets/eval_review.html</code> for editing and approval.</li>
+            <li><strong>Run optimization loop</strong> &mdash; Use <code>scripts/run_loop.py</code> to automatically test and improve the description.</li>
+            <li><strong>Apply the best description</strong> &mdash; Update <code>SKILL.md</code> frontmatter with the result.</li>
+        </ol>
+
+        <h3>Example Eval Query</h3>
+        <pre><code>[
+  {
+    "query": "ok so my boss just sent me this xlsx file... wants me to add a column that shows profit margin",
+    "should_trigger": true
+  },
+  {
+    "query": "can you explain how pivot tables work in excel? just curious, no file to process",
+    "should_trigger": false
+  }
+]</code></pre>
+
+        <div class="callout">
+            <div class="callout-title">Triggering Mechanism</div>
+            Skills appear in Claude's <code>available_skills</code> list with their name + description.
+            Claude decides whether to consult a skill based on that description. Simple, one-step queries
+            may not trigger a skill even if the description matches, because Claude can handle them directly
+            with basic tools. Complex, multi-step, or specialized queries reliably trigger skills when the
+            description matches.
+        </div>
+
+        <h3>Optimization Loop</h3>
+        <pre><code>python -m scripts.run_loop \
+  --eval-set trigger_evals.json \
+  --skill-path /path/to/skill \
+  --model claude-sonnet-4-6 \
+  --max-iterations 5 \
+  --verbose</code></pre>
+        <p>
+            The loop splits evals into 60% train and 40% held-out test. It evaluates the current description
+            (3 runs per query for reliability), calls Claude to propose improvements based on failures, and
+            re-evaluates each new description. The best description is selected by <strong>test score</strong>,
+            not train score, to avoid overfitting.
+        </p>
+
+        <h2>Quick Reference: File Outputs</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Produced By</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="file-path">evals/evals.json</span></td>
+                    <td>You (author)</td>
+                    <td>Defines test prompts and expectations</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">eval_metadata.json</span></td>
+                    <td>You (author)</td>
+                    <td>Per-eval metadata: prompt, assertions</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">outputs/transcript.md</span></td>
+                    <td>Executor agent</td>
+                    <td>Execution transcript</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">outputs/metrics.json</span></td>
+                    <td>Executor agent</td>
+                    <td>Tool call counts and file info</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">timing.json</span></td>
+                    <td>Harness / You</td>
+                    <td>Wall-clock timing and token usage</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">grading.json</span></td>
+                    <td>Grader agent</td>
+                    <td>Assertion pass/fail with evidence</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">benchmark.json</span></td>
+                    <td>aggregate_benchmark.py</td>
+                    <td>Aggregated statistics per configuration</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">feedback.json</span></td>
+                    <td>Human reviewer</td>
+                    <td>Qualitative feedback on outputs</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">comparison.json</span></td>
+                    <td>Blind comparator</td>
+                    <td>A/B comparison results</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">analysis.json</span></td>
+                    <td>Post-hoc analyzer</td>
+                    <td>Why the winner won + improvement suggestions</td>
+                </tr>
+                <tr>
+                    <td><span class="file-path">history.json</span></td>
+                    <td>Improve loop</td>
+                    <td>Version progression tracking</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <footer>
+            <p>
+                Generated from the <strong>skill-creator</strong> toolkit.<br>
+                For more details, see <span class="file-path">skill_creator/SKILL.md</span>
+                and <span class="file-path">skill_creator/references/schemas.md</span>.
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
