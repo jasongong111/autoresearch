@@ -1,0 +1,10 @@
+{"ts":"2026-05-21T14:00:00Z","type":"trace","id":"t1","name":"research-loop","userId":"alice","latencyMs":1200}
+{"ts":"2026-05-21T14:01:00Z","type":"observation","id":"o1","traceId":"t1","name":"plan","observationType":"generation","level":"DEFAULT","model":"gpt-5.5","userId":"alice","usage":{"input":1000,"output":500,"total":1500},"cost":{"input":0.01,"output":0.02,"total":0.03},"latencyMs":800}
+{"ts":"2026-05-21T14:02:00Z","type":"score","traceId":"t1","name":"quality","source":"API","dataType":"NUMERIC","value":1}
+{"ts":"2026-05-21T14:03:00Z","type":"trace","id":"t2","name":"research-loop","userId":"bob","latencyMs":2000}
+{"ts":"2026-05-21T14:04:00Z","type":"observation","id":"o2","traceId":"t2","name":"execute","observationType":"generation","level":"DEBUG","model":"claude-4.6","userId":"bob","usage":{"input":2000,"output":1000,"total":3000},"cost":{"input":0.04,"output":0.08,"total":0.12},"latencyMs":1500}
+{"ts":"2026-05-21T14:05:00Z","type":"score","traceId":"t2","name":"quality","source":"API","dataType":"NUMERIC","value":0}
+{"ts":"2026-05-21T15:00:00Z","type":"trace","id":"t3","name":"verify-loop","userId":"alice","latencyMs":500}
+{"ts":"2026-05-21T15:01:00Z","type":"observation","id":"o3","traceId":"t3","name":"verify","observationType":"tool","level":"WARNING","userId":"alice","latencyMs":300}
+{"ts":"2026-05-21T15:02:00Z","type":"score","traceId":"t3","name":"passed","source":"EVAL","dataType":"BOOLEAN","value":1}
+{"ts":"2026-05-21T15:03:00Z","type":"score","traceId":"t3","name":"category","source":"EVAL","dataType":"CATEGORICAL","value":"regression"}

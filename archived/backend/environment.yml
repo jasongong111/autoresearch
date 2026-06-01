@@ -1,0 +1,21 @@
+# Conda environment for the autoresearch monitoring dashboard.
+# Create:  conda env create -f dashboard/environment.yml
+# Update:  conda env update -f dashboard/environment.yml --prune
+# Activate: conda activate autoresearch-dashboard
+
+name: autoresearch-dashboard
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - fastapi>=0.100
+  - uvicorn>=0.23
+  - watchdog>=3.0
+  - pydantic>=2.0
+  - httpx>=0.24
+  - pytest>=7.0
+  # uvicorn[standard] extras (websockets, httptools, etc.)
+  - pip
+  - pip:
+      - uvicorn[standard]>=0.23.0
+      - cursor-sdk>=0.1.0
