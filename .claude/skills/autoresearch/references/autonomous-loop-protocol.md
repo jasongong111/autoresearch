@@ -16,29 +16,45 @@ When bounded, track `current_iteration` against `max_iterations`. After the fina
 **MUST complete ALL checks before entering the loop. Fail fast if any check fails.**
 
 ```bash
-# 1. Verify git repo exists
+# 1. Run setup.sh if present in task folder
+if [ -f "setup.sh" ]; then
+    bash setup.sh
+    # → If fails: warn user, fix or abort before entering loop
+fi
+
+# 2. Verify git repo exists
 git rev-parse --git-dir 2>/dev/null || echo "FAIL: not a git repo"
 # → If not a git repo: ask user to run `git init` or abort
 
-# 2. Check for dirty working tree
+# 3. Check for dirty working tree
 git status --porcelain
 # → If dirty: warn user and ask to stash or commit first
 #   NEVER proceed with uncommitted user changes — explicit git add will stage them
 
-# 3. Check for stale lock files
+# 4. Check for stale lock files
 ls .git/index.lock 2>/dev/null && echo "WARN: stale lock"
 # → If lock exists: remove it (rm .git/index.lock) or warn user
 
-# 4. Check for detached HEAD
+# 5. Check for detached HEAD
 git symbolic-ref HEAD 2>/dev/null || echo "WARN: detached HEAD"
 # → If detached: warn user, suggest `git checkout <branch>`
 
-# 5. Check for git hooks that might interfere
+# 6. Check for git hooks that might interfere
 ls .git/hooks/pre-commit .git/hooks/commit-msg 2>/dev/null && echo "INFO: git hook detected"
 ls .husky/pre-commit .husky/commit-msg 2>/dev/null && echo "INFO: husky hook detected"
 ls .pre-commit-config.yaml 2>/dev/null && echo "INFO: pre-commit framework detected"
 # → If hooks exist: note in setup log. If hook blocks commits during loop,
 #   treat as crash and log "hook blocked commit" — do NOT use --no-verify
+
+# 7. Scaffold verify harness if missing (agent_core tasks)
+test -f ./verify.sh || python "$REPO_ROOT/.claude/skills/autoresearch/scripts/scaffold_task_harness.py" --task-name "<task-folder-name>"
+
+# 8. Baseline commit MUST include skills/** (critical for safe_revert)
+test -f skills/*/SKILL.md || echo "FAIL: commit skills/ before first experiment"
+# → If the first experiment only adds SKILL.md, git revert on discard deletes it entirely.
+
+# 9. Confirm agent_core task binding (harness must pass task= matching folder name)
+grep -q 'task=' tests/run_agent_eval.py || echo "WARN: run_agent_eval.py missing task= for agent_core"
 ```
 
 **If metric-valued guard is configured** (has `Guard-Direction` and `Guard-Threshold`):
@@ -60,7 +76,7 @@ Before each iteration, build situational awareness. **You MUST complete ALL 7 st
 ```
 1. Read current state of in-scope files (full context)
 2. Read last 10-20 entries from autoresearch-results.tsv (the results log you wrote in prior rounds)
-3. Read the most recent record from .autoresearch/experiment.jsonl (the action log you wrote last round)
+3. Read the most recent record from `logs/experiment.jsonl` (the action log you wrote last round)
    — review hypothesis, filesModified, verifyOutput/guardOutput, status, and description
 4. MUST run: git log --oneline -20 to see recent changes
 5. MUST run: git diff HEAD~1 (if last iteration was "keep") to review what worked
@@ -75,10 +91,10 @@ Before each iteration, build situational awareness. **You MUST complete ALL 7 st
 tail -20 autoresearch-results.tsv
 
 # Last round's full action record (required every iteration after baseline)
-tail -1 .autoresearch/experiment.jsonl
+tail -1 logs/experiment.jsonl
 
 # Optional: scan last few rounds for repeating discard/crash patterns
-tail -5 .autoresearch/experiment.jsonl
+tail -5 logs/experiment.jsonl
 ```
 
 **Why read git history every time?** Git IS the memory. After rollbacks, state may differ from what you expect. The git log shows which experiments were kept vs reverted. The git diff of kept changes reveals WHAT specifically improved the metric — use this to inform the next iteration. Never assume — always verify.
@@ -93,169 +109,33 @@ tail -5 .autoresearch/experiment.jsonl
 
 Git as Memory is **always enabled** — it's a core behavior, not optional. The agent reads its own git history every iteration to learn from past experiments.
 
-### Configuration Parameters
-
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | Memory depth | 20 commits | How far back to read history |
 | Diff review | HEAD~1 | How far back to diff kept changes |
 | Full history | disabled | Read all branches |
 
-### How It Works (step by step)
-
-At the start of EVERY iteration (Phase 1), the agent runs:
+At the start of every iteration (Phase 1), the agent runs:
 
 ```bash
-# Step 0: Read recent outcomes and last round's action log
-tail -20 autoresearch-results.tsv
-tail -1 .autoresearch/experiment.jsonl
-
-# Step 1: Read recent experiment history
-git log --oneline -20
-# Shows: kept commits remain, discarded ones were reverted
-
-# Step 2: Inspect the last successful change
-git diff HEAD~1
-# Shows: exact diff that improved the metric — informs next experiment
-
-# Step 3: Check what was tried (avoid repeating failures)
-git log --oneline -20 | grep "experiment"
-# Shows: all experiment descriptions
-
-# Step 4: Deep-dive a specific success
-git show abc1234 --stat
-# Shows: which files were changed in a successful experiment
+tail -20 autoresearch-results.tsv        # recent outcomes
+tail -1 logs/experiment.jsonl            # last round's action log
+git log --oneline -20                    # what was tried (kept vs reverted)
+git diff HEAD~1                          # exact diff that worked
+git log --oneline -20 | grep "experiment" # all experiment descriptions
+git show <hash> --stat                  # deep-dive a specific success
 ```
 
-### Example: Memory in Action
+**Example:** Agent reads git log and sees:
+- `a1b2c3d experiment(api): add response caching` — KEPT
+- `Revert "experiment(api): increase cache TTL to 60s"` — REVERTED
+- `c3d4e5f experiment(api): add cache invalidation on write` — KEPT
 
-```
-# Agent reads git log and sees:
-# a1b2c3d experiment(api): add response caching — KEPT (metric improved)
-# d4e5f6g Revert "experiment(api): increase cache TTL to 60s" — REVERTED
-# c3d4e5f experiment(api): add cache invalidation on write — KEPT
-#
-# Agent learns:
-# ✓ Caching works (2 kept commits)
-# ✗ Increasing TTL didn't help (reverted)
-# → Next: try a different cache strategy, NOT longer TTL
-```
-
-### Git Memory Integration with the Autonomous Loop
-
-Shows exactly how git memory integrates at each loop phase with executable bash.
-
-```bash
-# === PHASE 0: Initialize Git Memory ===
-# Verify git repo is ready for memory tracking
-git_memory_init() {
-  git rev-parse --git-dir 2>/dev/null || { echo "FAIL: not a git repo"; return 1; }
-  git status --porcelain | grep -q . && { echo "WARN: dirty tree — stash or commit first"; return 1; }
-  echo "✓ Git memory initialized — $(git log --oneline | wc -l) commits available"
-}
-
-# === PHASE 1: Read Git Memory ===
-# Called at the START of every iteration to build situational awareness
-read_git_memory() {
-  local depth=${1:-20}
-
-  # 1. Recent experiment history (what was tried)
-  echo "=== Recent Experiments ==="
-  git log --oneline -"$depth" | grep -E "experiment|Revert"
-
-  # 2. Last successful change (what worked and why)
-  echo "=== Last Kept Change ==="
-  git diff HEAD~1 --stat 2>/dev/null
-
-  # 3. Pattern detection (which files drive improvements)
-  echo "=== Success Patterns ==="
-  git log --oneline -"$depth" --diff-filter=M --name-only | sort | uniq -c | sort -rn | head -5
-
-  # 4. Failed approaches (what to avoid)
-  echo "=== Reverted Experiments (avoid repeating) ==="
-  git log --oneline -"$depth" | grep "Revert" | sed 's/Revert "//' | sed 's/"$//'
-}
-
-# === PHASE 2: Query Git Memory for Decision Making ===
-# Before choosing the next experiment, the agent queries history
-query_git_memory() {
-  local query="$1"
-
-  # Find commits related to a topic
-  git log --oneline -20 --grep="$query" 2>/dev/null
-
-  # Check if this approach was already tried and reverted
-  if git log --oneline -20 | grep -q "Revert.*$query"; then
-    echo "⚠ WARNING: '$query' was tried before and REVERTED — try a different approach"
-    return 1
-  fi
-  return 0
-}
-
-# === PHASE 6: Write to Git Memory ===
-# Commit becomes memory. Revert becomes "lesson learned."
-write_git_memory() {
-  local scope="$1" description="$2"
-  git add "$scope"
-  git commit -m "experiment($scope): $description"
-  echo "✓ Experiment committed to git memory"
-}
-```
-
-### Error Handling for Git Operations
-
-```bash
-# Safe git operations with error handling
-safe_git_log() {
-  git log --oneline -"${1:-20}" 2>/dev/null || echo "WARN: git log failed — empty repo?"
-}
-
-safe_git_diff() {
-  git diff HEAD~1 --stat 2>/dev/null || echo "INFO: no previous commit to diff (first iteration)"
-}
-
-# Handle detached HEAD (common after revert conflicts)
-ensure_on_branch() {
-  if ! git symbolic-ref HEAD 2>/dev/null; then
-    echo "WARN: detached HEAD detected — creating recovery branch"
-    git checkout -b autoresearch-recovery-$(date +%s)
-  fi
-}
-```
-
-### Complete Integration Example
-
-```
-/autoresearch
-Goal: Improve ML model accuracy from 85% to 95%
-Scope: model.py, config.yaml
-Verify: python train.py --eval 2>&1 | grep 'accuracy' | awk '{print $2}'
-
-# What happens internally at each iteration:
-
-# Iteration 3 — Agent reads git memory:
-$ git log --oneline -5
-# c3d4e5f experiment(model): increase hidden layers from 2 to 4 — KEPT
-# Revert "experiment(model): switch optimizer to SGD"
-# a1b2c3d experiment(model): add dropout 0.3 — KEPT
-# 0000000 baseline — accuracy 85%
-
-# Agent's decision process (informed by git memory):
-# ✓ "increase hidden layers" KEPT → try variant: increase to 6 layers
-# ✗ "switch to SGD" REVERTED → avoid optimizer changes
-# ✓ "add dropout" KEPT → dropout works, try adjusting rate
-# → Decision: increase hidden layers from 4 to 6 (exploiting success pattern)
-
-# Agent modifies model.py, commits:
-$ git commit -m "experiment(model): increase hidden layers from 4 to 6"
-# Verify: accuracy = 91.2% (+2.1%) → KEEP
-
-# Next iteration reads updated memory, sees 3 successful layer changes...
-```
+Agent learns: caching works, longer TTL doesn't. Next: try a different cache strategy, NOT longer TTL.
 
 ## Phase 2: Ideate (Strategic)
 
-Pick the NEXT change. **MUST consult git history, results log, and the last `.autoresearch/experiment.jsonl` record before deciding.**
+Pick the NEXT change. **MUST consult git history, results log, and the last `logs/experiment.jsonl` record before deciding.**
 
 **How to use git as memory:**
 - Run `git log --oneline -10` — read commit messages to see what was tried
@@ -386,80 +266,22 @@ fi
 # If you need "and", split into separate iterations
 ```
 
-### Atomicity Configuration
+### Atomicity
 
-Configure how strictly the agent enforces the one-change-per-iteration rule:
+One logical change per iteration. Multi-file is fine if it serves a single purpose.
 
-```
-/autoresearch
-Goal: Optimize API response time
-Scope: src/api/**/*.ts
-Verify: wrk -t2 -c10 -d10s http://localhost:3000 | grep 'Avg Lat' | awk '{print $2}'
-Atomicity: strict       # enforce one-change rule (default)
-Max-Files-Per-Change: 3  # alert if >3 files modified in one iteration
-```
+**The one-sentence test:** If you need "and" to describe it, it's two changes.
 
-**Atomicity levels:**
+| Atomicity | Behavior | When to Use |
+|-----------|----------|-------------|
+| `strict` (default) | One logical change. Self-check before commit. Warn if >5 files. | Most optimization tasks |
+| `relaxed` | Coordinated multi-file changes OK. Still requires one-sentence description. | Infrastructure/config spanning many files |
 
-| Level | Behavior | When to Use |
-|-------|----------|-------------|
-| `strict` (default) | Agent MUST make exactly one logical change per iteration. Self-check validates before commit. If >5 files changed, agent re-evaluates and splits if needed. | Most optimization tasks |
-| `relaxed` | Agent can make coordinated multi-file changes as one unit. No file count warnings. Still requires one-sentence description test. | Infrastructure/config changes spanning many files |
-
-**How the agent enforces atomicity at Phase 3:**
-
+**Self-check before committing:**
 ```bash
-# Step 1: Before making any change, write the description
-DESCRIPTION="add response caching to /api/users endpoint"
-# Test: Can this be said in ONE sentence without "and"? → Yes ✓
-
-# Step 2: Make the change (modify files)
-# ... edit src/api/users.ts ...
-
-# Step 3: Validate atomicity before committing
-FILES_CHANGED=$(git diff --name-only | wc -l | tr -d ' ')
-LINES_CHANGED=$(git diff --stat | tail -1 | grep -oP '\d+ insertion' | grep -oP '\d+' || echo 0)
-
-if [ "$FILES_CHANGED" -gt "${MAX_FILES:-5}" ]; then
-  echo "⚠ ATOMICITY CHECK: ${FILES_CHANGED} files changed"
-  echo "  Review: is this truly ONE logical change?"
-  echo "  If not, split into separate iterations"
-  # Agent re-evaluates and may undo partial changes
-fi
-
-# Step 4: Verify the one-sentence test passes
-echo "Change: ${DESCRIPTION}"
-# If description contains "and" linking unrelated actions → SPLIT
-echo "$DESCRIPTION" | grep -qE '\band\b.*\b(add|remove|change|update|fix)\b' && \
-  echo "⚠ Description contains 'and' with multiple actions — consider splitting"
-
-# Step 5: Commit only if atomicity validated
-git add <specific-files>
-git commit -m "experiment(api): ${DESCRIPTION}"
-```
-
-**Examples of atomicity enforcement:**
-
-```
-# ✓ ATOMIC — passes all checks:
-Description: "add response caching to /api/users"
-Files changed: 1 (src/api/users.ts)
-→ Commit proceeds
-
-# ✓ ATOMIC — multi-file but single intent:
-Description: "add Redis caching layer"
-Files changed: 3 (docker-compose.yml, src/cache.ts, src/api/users.ts)
-→ Same intent across files, commit proceeds
-
-# ✗ NOT ATOMIC — fails one-sentence test:
-Description: "add caching AND refactor error handling"
-→ Contains "and" linking unrelated actions
-→ Split into: iteration N = "add caching", iteration N+1 = "refactor error handling"
-
-# ✗ NOT ATOMIC — too many unrelated files:
-Description: "optimize performance"
-Files changed: 12 (across api, db, frontend, config)
-→ Too broad — split into focused iterations
+FILES_CHANGED=$(git diff --name-only | wc -l)
+# >5 files → re-evaluate: is this truly ONE change?
+# Description contains "and" + action verb → SPLIT
 ```
 
 ## Phase 4: Commit (Before Verification)
@@ -514,7 +336,16 @@ git checkout -- <in-scope files>   # restore files to last committed state
 
 ## Phase 5: Verify (Mechanical Only)
 
-Run the agreed-upon verification command. Capture output.
+Run the agreed-upon verification command. In this repository, the Verify command loads `expected/eval.json`, runs each test case through `agent_core` with the skill under test on the gemma-4-e2b model, rates gemma4's output against the expectations, and prints a single metric number. Capture output.
+
+**How eval.json verification works:**
+
+1. The verify script (e.g., `./verify.sh`) reads `expected/eval.json` — an array of test cases, each with `id`, `name`, `prompt`, and `expectations`.
+2. For each test case, it calls `python -m agent_core chat --task <task-name> <prompt>` or uses the programmatic `SkillAgentRunner` API.
+3. `agent_core` discovers the skill from `tasks/<task-name>/skills/` and runs the prompt through the gemma-4-e2b model.
+4. The scorer rates gemma4's output against each item in the `expectations` array (e.g., did it use the right API? did it include the required fields?).
+5. The script aggregates the scores and prints exactly one number — the metric — to stdout.
+6. The agent run trace is written to `logs/agent-core/agent_core_trace.jsonl` for inspection.
 
 **Timeout rule:** If verification exceeds 2x normal time, kill and treat as crash.
 
@@ -536,7 +367,7 @@ IF extracted_value does NOT match pattern: ^-?[0-9]+\.?[0-9]*$
     LOG iteration as:
       status=metric-error
       description="Metric extraction returned non-numeric value: '{extracted_value}'"
-    safe_revert()
+    .claude/skills/autoresearch/scripts/safe_revert.sh
 
     # Diagnose: show the raw verify output so the problem is visible
     PRINT "⚠ Metric extraction failed — got '{extracted_value}' instead of a number"
@@ -557,120 +388,135 @@ IF extracted_value does NOT match pattern: ^-?[0-9]+\.?[0-9]*$
 
 **Valid statuses** now include `metric-error` alongside `keep`, `discard`, `crash`, `no-op`, `hook-blocked`.
 
-### Verification Command Templates by Language
+### Verification Command Templates for agent_core + eval.json
 
-| Language | Verify Command | Metric | Direction |
-|----------|---------------|--------|-----------|
-| **Node.js** | `npx jest --coverage 2>&1 \| grep 'All files' \| awk '{print $4}'` | Coverage % | higher |
-| **Python** | `pytest --cov=src --cov-report=term 2>&1 \| grep TOTAL \| awk '{print $4}'` | Coverage % | higher |
-| **Rust** | `cargo test 2>&1 \| grep -oP '\d+ passed' \| grep -oP '\d+'` | Tests passed | higher |
-| **Go** | `go test -count=1 ./... 2>&1 \| grep -c '^ok'` | Packages passing | higher |
-| **Java** | `mvn test 2>&1 \| grep 'Tests run:' \| tail -1 \| grep -oP 'Failures: \d+' \| grep -oP '\d+'` | Failures | lower |
-| **Bundle** | `npx esbuild src/index.ts --bundle --minify \| wc -c` | Bytes | lower |
-| **Lighthouse** | `npx lighthouse http://localhost:3000 --output=json \| jq '.categories.performance.score * 100'` | Score 0-100 | higher |
-| **Latency** | `wrk -t2 -c10 -d10s http://localhost:3000/api 2>&1 \| grep 'Avg Lat' \| awk '{print $2}'` | ms | lower |
+These templates show common patterns for verifying a skill against an `eval.json` file. The actual Verify command is a script that wraps one of these patterns and extracts a single number.
+
+| Pattern | Verify Command | Metric | Direction |
+|---------|---------------|--------|-----------|
+| **Pass rate** | `python run_eval.py --eval expected/eval.json --task <task>` | Fraction of cases passing all expectations | higher |
+| **Expectation accuracy** | `python run_eval.py --eval expected/eval.json --task <task>` | Fraction of individual expectations met | higher |
+| **Tool-use accuracy** | `python run_eval.py --eval expected/eval.json --task <task> --metric tools` | Tool calls correct | higher |
+| **Latency** | `python run_eval.py --eval expected/eval.json --task <task> --metric latency` | Avg ms per case | lower |
+| **Token efficiency** | `python run_eval.py --eval expected/eval.json --task <task> --metric tokens` | Avg tokens per case | lower |
+
+**eval.json format:**
+
+```json
+[
+  {
+    "id": 1,
+    "name": "test-case-name",
+    "prompt": "The user prompt sent to agent_core",
+    "expectations": [
+      "The agent does not use SQL",
+      "The agent queries the HTTP API",
+      "The output includes the required fields"
+    ]
+  }
+]
+```
+
+**Important:** The verify script must set `GEMMA4_API_KEY` (and optionally `GEMMA4_MODEL_ID`, `GEMMA4_BASE_URL`) before calling `agent_core`. The agent_core runner automatically discovers skills from `tasks/<task>/skills/` when `--task` is provided.
 
 ## Phase 5.1: Noise Handling (for Volatile Metrics)
 
-Some metrics are inherently noisy — benchmark times, ML accuracy, Lighthouse scores. A single measurement can mislead. Use these strategies to prevent false keep/discard decisions.
+Agent runs can be noisy — model temperature, non-deterministic tool ordering, or random seeds can produce slightly different outputs across runs. Use these strategies to prevent false keep/discard decisions.
 
-### Strategy 1: Multi-Run Verification
+| Strategy | When to use | Config |
+|----------|-------------|--------|
+| **Multi-run median** | High variance in pass rate across runs | `Noise: high` (3 runs) or `Noise-Runs: 5` |
+| **Min-delta threshold** | Marginal improvements that could be noise | `Min-Delta: 0.05` — only keep if delta > threshold |
+| **Confirmation run** | Unsure if improvement is real | Re-run verify; keep only if both agree |
+| **Model pinning** | Non-deterministic outputs | Set `temperature=0`, fixed seeds, deterministic ordering |
 
-Run verify N times and use the median to filter outliers:
-
-```bash
-# Single run (unreliable for noisy metrics):
-npm run benchmark  # might report 142ms or 158ms randomly
-
-# Multi-run with median (reliable):
-for i in 1 2 3; do
-  npm run benchmark 2>&1 | grep 'avg' | awk '{print $2}'
-done | sort -n | sed -n '2p'  # median of 3 runs
-```
-
-Configure via inline config:
-```
-/autoresearch
-Verify: npm run benchmark 2>&1 | grep 'avg' | awk '{print $2}'
-Noise: high           # triggers 3-run median automatically
-Noise-Runs: 5         # custom: 5 runs instead of default 3
-```
-
-### Strategy 2: Minimum Improvement Threshold
-
-Ignore improvements smaller than the noise floor:
-
-```
-# Configuration:
-Min-Delta: 2.0   # only keep if improvement > 2%
-
-# Decision logic (extends Phase 6):
-IF metric_improved AND delta > min_delta:
-    STATUS = "keep"
-ELIF metric_improved AND delta <= min_delta:
-    STATUS = "discard"
-    LOG "NOISE: delta {delta} below threshold {min_delta}"
-```
-
-### Strategy 3: Confirmation Run
-
-Re-verify before making a final keep decision:
-
-```
-IF metric_improved:
-    second_metric = run_verify()  # run verify again
-    IF abs(second_metric - first_metric) / first_metric < 0.01:
-        STATUS = "keep"     # confirmed — both runs agree
-    ELSE:
-        STATUS = "discard"  # first result was noise
-        LOG "NOISE: confirmation run disagreed"
-```
-
-### Strategy 4: Environment Pinning
-
-Reduce noise at the source by controlling external factors:
-
-```bash
-# Pin random seeds for ML/statistical workloads
-PYTHONHASHSEED=42 python train.py --seed 42
-
-# Use deterministic test ordering
-pytest -p no:randomly
-
-# Flush caches before benchmarking
-redis-cli FLUSHALL 2>/dev/null; npm run benchmark
-
-# Warm up before timing (eliminates JIT/cold-start noise)
-node server.js &
-sleep 2
-wrk -t1 -c1 -d3s http://localhost:3000  # warm-up (discard)
-wrk -t2 -c10 -d10s http://localhost:3000  # actual measurement
-```
-
-### When to Use Each Strategy
-
-| Metric Type | Noise Level | Strategy |
-|-------------|-------------|----------|
-| Test coverage (%) | None | No special handling |
-| Bundle size (bytes) | None | No special handling |
-| Benchmark time (ms) | Medium | Multi-run median (3 runs) |
-| Lighthouse score | Medium | Multi-run median (5 runs) |
-| ML training loss | High | Environment pinning + confirmation run |
-| API response time | High | Warm-up + multi-run + min-delta |
-
-### Preventing Premature Rollbacks
-
-When a metric seems worse but could be noise:
-
+**Preventing premature rollbacks:**
 ```
 IF metric_worse AND abs(delta) < noise_floor:
-    second_result = run_verify()  # confirm the regression
-    IF second_result also worse:
-        STATUS = "discard"    # confirmed regression — revert
-    ELSE:
-        STATUS = "keep"       # first measurement was noise — keep the change
-        LOG "NOISE: initial regression not confirmed on re-run"
+    second_result = run_verify()
+    IF second_result also worse: STATUS = "discard"
+    ELSE: STATUS = "keep" ; LOG "NOISE: regression not confirmed"
 ```
+
+## Phase 5.2: Selection Split Validation (Anti-Overfitting Gate)
+
+A candidate skill that improves on the training split is **not** automatically accepted. It must also pass the selection validation before it can replace the previous best skill. The selection split runs `holdout/eval.json` through `agent_core` on the gemma-4-e2b model and scores gemma4's output against the expectations. This acts as a held-out generalization checkpoint.
+
+**Configuration:**
+```
+/autoresearch
+Goal: Maximize benchmark score
+Verify: ./verify.sh                              # runs against expected/eval.json (training / dev split)
+Selection-Verify: python run_eval.py --eval holdout/eval.json --task <task-name>
+Direction: higher
+```
+
+**Why this matters:** Optimizing solely against a dev split invites overfitting — the skill memorizes training-case quirks rather than learning the underlying task. The selection split acts as a generalization checkpoint. The optimizer does not see holdout data during the training rollout, so performance there measures true skill improvement.
+
+**When to run:** Phase 5.2 executes whenever the training-split metric from Phase 5 strictly improved relative to the best training metric. If training split did not improve, the candidate is already headed for discard — skip Phase 5.2 to save time.
+
+**Protocol:**
+
+```
+IF training_metric did NOT improve:
+    # Skip selection check — candidate will be discarded
+    CONTINUE to Phase 6
+
+IF Selection-Verify is configured:
+    selection_command = Selection-Verify
+ELSE:
+    # Default: run holdout/eval.json through agent_core using the same runner as Verify
+    selection_command = <same runner but pointed at holdout/eval.json>
+
+selection_metric = run(selection_command)
+
+# Validate selection metric is numeric (same rules as primary metric)
+IF selection_metric does NOT match pattern: ^-?[0-9]+\.?[0-9]*$
+    STATUS = "metric-error"
+    DESCRIPTION = "Selection-Verify returned non-numeric value: '{selection_metric}'"
+    .claude/skills/autoresearch/scripts/safe_revert.sh
+    CONTINUE to Phase 7 (log)
+
+# Strict improvement required on selection split
+IF selection_metric is better than best_selection_metric (respecting Direction):
+    STATUS = "keep"
+    best_selection_metric = selection_metric
+    best_training_metric = training_metric  # update training best too
+    best_iteration = current_iteration
+    iterations_since_best = 0
+    # Commit stays. Proceed to Phase 7 (log).
+ELSE:
+    STATUS = "discard (selection)"
+    REASON = "training split improved ({training_metric}) but selection split did not generalize ({selection_metric} vs best {best_selection_metric})"
+    .claude/skills/autoresearch/scripts/safe_revert.sh
+    # Proceed to Phase 7 (log)
+```
+
+**State tracking:**
+
+Add these to the per-session state tracked across iterations:
+
+| Variable | Initial Value | Updated When |
+|----------|---------------|--------------|
+| `best_training_metric` | Baseline from iteration 0 on Verify | Training split improves |
+| `best_selection_metric` | Baseline from iteration 0 on Selection-Verify | Selection split improves |
+| `best_iteration` | 0 | Either split sets a new best |
+
+In the TSV log, `metric` records the **training** metric (the primary optimization signal). In the NDJSON experiment log, also record `selectionMetric` when available.
+
+**Setup baseline for selection split:**
+
+During Setup Step 8 (establish baseline):
+1. Run the selection command against the current skill state
+2. Validate the output is numeric
+3. Record as `best_selection_metric` in iteration 0's log entry
+4. If it fails or returns non-numeric, warn the user but do not block the loop
+
+**Important rules:**
+- Do NOT modify the skill between training verify and selection verify. Both commands evaluate the **same committed change**.
+- The selection split command must be independent — it should not read or depend on results from the training verify.
+- Selection split evaluation counts as part of the same iteration. It does not consume a separate iteration number.
+- Never tune the skill directly against the selection split. Use it only as an acceptance gate, not as a gradient signal.
 
 ## Phase 5.5: Guard (Regression Check)
 
@@ -724,7 +570,7 @@ Guard-Threshold: 5%
 
 When the guard fails but the metric improved, the optimization idea may still be viable — it just needs a different implementation that doesn't break behavior:
 
-1. Revert the change (use `safe_revert()` — try `git revert HEAD --no-edit`, fallback to `git reset --hard HEAD~1` if conflicts)
+1. Revert the change (run `.claude/skills/autoresearch/scripts/safe_revert.sh`)
 2. Read the guard output to understand WHAT broke (which tests, which assertions)
 3. Rework the optimization to avoid the regression — e.g.:
    - If inlining a function broke callers → try a different optimization angle
@@ -737,35 +583,20 @@ When the guard fails but the metric improved, the optimization idea may still be
 
 ## Phase 6: Decide (No Ambiguity)
 
+**Selection split short-circuit:** If Phase 5.2 ran and already set STATUS to `"keep"` or `"discard (selection)"`, skip directly to Phase 7 (Log Results). The selection split is the final arbiter — no further decision logic applies.
+
+**Rollback:** Use the provided script for all discard/crash decisions:
 ```bash
-# Rollback function — used for all discard/crash decisions
-safe_revert() {
-  echo "Reverting: $(git log --oneline -1)"
-
-  # Attempt 1: git revert (preserves history — preferred)
-  if git revert HEAD --no-edit 2>/dev/null; then
-    echo "✓ Reverted via git revert (experiment preserved in history for learning)"
-    return 0
-  fi
-
-  # Attempt 2: revert conflicted — fallback to reset
-  git revert --abort 2>/dev/null
-  echo "⚠ Revert conflicted — using git reset --hard HEAD~1"
-  git reset --hard HEAD~1
-  echo "✓ Reverted via reset (experiment removed from history)"
-  return 0
-}
-
-# Usage in Phase 6 decision logic:
-# if STATUS == "discard" or STATUS == "crash": safe_revert
+.claude/skills/autoresearch/scripts/safe_revert.sh
 ```
+This tries `git revert HEAD --no-edit` first (preserves history), and falls back to `git reset --hard HEAD~1` only if revert conflicts.
 
 ```
 IF metric_improved AND (no guard OR guard_passed):
     STATUS = "keep"
     # Do nothing — commit stays. Git history preserves this success.
 ELIF metric_improved AND guard_failed:
-    safe_revert()
+    .claude/skills/autoresearch/scripts/safe_revert.sh
     # Rework the optimization (max 2 attempts)
     FOR attempt IN 1..2:
         Analyze guard output → rework implementation (NOT tests)
@@ -776,20 +607,20 @@ ELIF metric_improved AND guard_failed:
             IF guard_passed:
                 STATUS = "keep (reworked)"
                 BREAK
-        safe_revert()
+        .claude/skills/autoresearch/scripts/safe_revert.sh
     IF still failing after 2 attempts:
         STATUS = "discard"
         REASON = "guard failed, could not rework optimization"
 ELIF metric_same_or_worse:
     STATUS = "discard"
-    safe_revert()
+    .claude/skills/autoresearch/scripts/safe_revert.sh
 ELIF crashed:
     # Attempt fix (max 3 tries)
     IF fixable:
         Fix → re-commit → re-verify → re-guard
     ELSE:
         STATUS = "crash"
-        safe_revert()
+        .claude/skills/autoresearch/scripts/safe_revert.sh
 ```
 
 **Why `git revert` instead of `git reset --hard`?**
@@ -811,18 +642,21 @@ iteration  commit   metric   status        description
 46         -        -        hook-blocked  pre-commit lint hook rejected formatting in model.py
 ```
 
-**Valid statuses:** `keep`, `keep (reworked)`, `discard`, `crash`, `no-op`, `hook-blocked`, `metric-error`
+**Valid statuses:** `keep`, `keep (reworked)`, `discard`, `discard (selection)`, `crash`, `no-op`, `hook-blocked`, `metric-error`
 
 ### 7b — Append to experiment action log (NDJSON format)
 
-Immediately after writing the TSV row, append one structured record to `.autoresearch/experiment.jsonl`:
+Use the provided script to write both TSV and NDJSON in one call:
 
 ```bash
-# Minimal record (required fields only)
-printf '{"iteration":%s,"timestamp":"%s","status":"%s","commit":"%s","metric":%s,"delta":%s,"guard":"%s","description":"%s"}\n' \
-  "${ITERATION}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${STATUS}" "${COMMIT}" \
-  "${METRIC:-null}" "${DELTA:-null}" "${GUARD}" "${DESCRIPTION}" \
-  >> .autoresearch/experiment.jsonl
+python .claude/skills/autoresearch/scripts/log_iteration.py \
+  --iteration 3 \
+  --commit "b2c3d4e" \
+  --metric 0.65 \
+  --delta 0.05 \
+  --guard pass \
+  --status keep \
+  --description "add API routing rules"
 ```
 
 Optional fields to include when available:
@@ -830,6 +664,7 @@ Optional fields to include when available:
 | Field | When to include |
 |-------|-----------------|
 | `guardMetric` | When using a metric-valued guard |
+| `selectionMetric` | When selection split validation was run |
 | `hypothesis` | The agent's reasoning for why this change would work |
 | `filesRead` | Array of files read during Phase 1–3 |
 | `filesModified` | Array of files actually changed in Phase 3 |
@@ -865,7 +700,7 @@ Example full record:
 **Rules:**
 - Write **both** the TSV row and the NDJSON record for every iteration (including baseline).
 - Write them **immediately** after the keep/discard decision while context is fresh.
-- Do NOT commit `.autoresearch/experiment.jsonl` to git (`.autoresearch/` should be gitignored).
+- Do NOT commit `logs/experiment.jsonl` to git (`logs/` should be gitignored).
 
 ## Phase 8: Repeat
 
@@ -1003,7 +838,7 @@ IF working tree is dirty (changes not yet committed):
 IF last commit is "experiment(...)" with no matching results log entry:
     # Agent crashed after Phase 4 (commit) but before Phase 6 (decide)
     # The experiment was never verified. Revert it.
-    safe_revert()
+    .claude/skills/autoresearch/scripts/safe_revert.sh
     LOG "Recovered from session crash: reverted unverified experiment"
     Resume loop from Phase 1
 

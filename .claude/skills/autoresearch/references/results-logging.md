@@ -15,11 +15,11 @@ echo -e "iteration\tcommit\tmetric\tdelta\tguard\tguard-metric\tstatus\tdescript
 echo "autoresearch-results.tsv" >> .gitignore
 
 # 3. Run verify command to establish baseline metric
-BASELINE=$(npx jest --coverage 2>&1 | grep 'All files' | awk '{print $4}')
+BASELINE=$(./verify.sh)
 
 # 4. Record baseline as iteration 0
 COMMIT=$(git rev-parse --short HEAD)
-echo -e "0\t${COMMIT}\t${BASELINE}\t0.0\tpass\tbaseline\tinitial state — coverage ${BASELINE}%" >> autoresearch-results.tsv
+echo -e "0\t${COMMIT}\t${BASELINE}\t0.0\tpass\t-\tbaseline\tinitial state — metric ${BASELINE}" >> autoresearch-results.tsv
 ```
 
 ## Logging Function
@@ -48,7 +48,7 @@ log_iteration 6 "-" "-" "-" "-" "-" "metric-error" "verify output was 'PASS' —
 ```bash
 # Phase 1 (Review): Read recent entries for pattern recognition
 tail -20 autoresearch-results.tsv
-tail -1 .autoresearch/experiment.jsonl
+tail -1 logs/experiment.jsonl
 
 # Count outcomes for progress tracking
 KEEPS=$(grep -c 'keep' autoresearch-results.tsv || echo 0)
@@ -80,19 +80,19 @@ Phase 8 (Repeat):   → Back to Phase 1 (reads updated logs)
 Complete end-to-end example:
 
 ```
-$autoresearch
-Goal: Increase test coverage from 72% to 90%
-Scope: src/**/*.ts
-Verify: npx jest --coverage 2>&1 | grep 'All files' | awk '{print $4}'
-Guard: npm run typecheck
+/autoresearch
+Goal: Maximize Gemma 4 E2B pass rate on the dev eval set
+Scope: skills/**/*
+Verify: ./verify.sh
+Guard: ./scripts/check-evaluator-integrity.sh
 
 # Internal lifecycle:
-# 1. Agent creates autoresearch-results.tsv with baseline 72.0
+# 1. Agent creates autoresearch-results.tsv with baseline 0.60
 # 2. Agent reads log (empty except baseline) → decides first experiment
-# 3. Agent modifies code, commits, runs verify → gets 74.5
-# 4. Agent appends: "1  b2c3d4e  74.5  +2.5  pass  keep  add auth middleware tests"
-# 5. Next iteration: agent reads log, sees auth tests worked → tries similar pattern
-# 6. Continues until coverage reaches 90% or iterations exhausted
+# 3. Agent modifies skill, commits, runs verify → gets 0.65
+# 4. Agent appends: "1  b2c3d4e  0.65  +0.05  pass  keep  add API routing rules"
+# 5. Next iteration: agent reads log, sees routing rules worked → tries similar pattern
+# 6. Continues until pass rate plateaus or iterations exhausted
 ```
 
 ## Log Format (TSV)
@@ -143,7 +143,7 @@ iteration	commit	metric	delta	guard	guard-metric	status	description
 
 ## Experiment Action Log (`experiment.jsonl`)
 
-Append a structured NDJSON record to `.autoresearch/experiment.jsonl` at the end of **every iteration** (including baseline). This file captures *what the agent did* — files read, tools used, hypothesis, and full result — so you can reconstruct the exact agent actions later.
+Append a structured NDJSON record to `logs/experiment.jsonl` at the end of **every iteration** (including baseline). This file captures *what the agent did* — files read, tools used, hypothesis, and full result — so you can reconstruct the exact agent actions later.
 
 ### Schema
 
@@ -203,10 +203,10 @@ log_experiment() {
   local iteration=$1 status=$2 commit=$3 metric=$4 delta=$5 guard=$6 description=$7
   local ts
   ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  mkdir -p .autoresearch
+  mkdir -p logs
   printf '{"iteration":%s,"timestamp":"%s","status":"%s","commit":"%s","metric":%s,"delta":%s,"guard":"%s","description":"%s"}\n' \
     "$iteration" "$ts" "$status" "$commit" "${metric:-null}" "${delta:-null}" "$guard" "$description" \
-    >> .autoresearch/experiment.jsonl
+    >> logs/experiment.jsonl
 }
 
 # Usage:
@@ -217,14 +217,14 @@ log_experiment 2 "discard" "-" "86.5" "-0.6" "pass" "refactor helpers (broke 2 t
 **Rules:**
 - Write the record **immediately after** appending to `autoresearch-results.tsv` (Phase 7).
 - Always write a record, even for `no-op`, `crash`, and `metric-error`.
-- Do NOT commit this file to git (it is already under `.autoresearch/` which should be gitignored).
+- Do NOT commit this file to git (`logs/` should be gitignored).
 
 ## Log Management
 
 - Create at setup (iteration 0 = baseline)
-- Append after EVERY iteration (including crashes) — both TSV and `experiment.jsonl`
+- Append after EVERY iteration (including crashes) — both TSV and `logs/experiment.jsonl`
 - Do NOT commit these files to git (add to `.gitignore`)
-- At Phase 1 (Review): read last 10-20 TSV rows **and** `tail -1 .autoresearch/experiment.jsonl`
+- At Phase 1 (Review): read last 10-20 TSV rows **and** `tail -1 logs/experiment.jsonl`
 - Use both logs to detect patterns: what kind of changes tend to succeed, and what verify output explained failures?
 
 ## Summary Reporting
