@@ -1,0 +1,46 @@
+[
+  {
+    "id": 1,
+    "name": "employee-lookup-by-code",
+    "prompt": "Find the full details for employee E-0004. I need their name, role, salary, and phone number.",
+    "expectations": [
+      "The agent does not use SQL, psql, asyncpg, or any direct database connection",
+      "The agent queries the HTTP API at localhost:8000/api/v1",
+      "The agent resolves the business code E-0004 by listing employees and filtering, not by using it in the URL path",
+      "The output includes the employee's name, role, salary_usd, and phone"
+    ]
+  },
+  {
+    "id": 2,
+    "name": "top-products-by-revenue",
+    "prompt": "What are the top 3 products by total revenue? Show me the product name and revenue for each.",
+    "expectations": [
+      "The agent does not use SQL, psql, asyncpg, or any direct database connection",
+      "The agent queries the HTTP API at localhost:8000/api/v1",
+      "The agent uses the /analytics/product-sales endpoint instead of fetching all products and manually aggregating",
+      "The output includes the names and revenue of the top 3 products"
+    ]
+  },
+  {
+    "id": 3,
+    "name": "transaction-nested-details",
+    "prompt": "Show me the 2 most recent transactions. For each one, include the transaction date, the shopper's name, the employee's name, and the product name.",
+    "expectations": [
+      "The agent does not use SQL, psql, asyncpg, or any direct database connection",
+      "The agent queries the HTTP API at localhost:8000/api/v1",
+      "The agent uses a detail or full endpoint that returns nested shopper, employee, and product objects",
+      "The output includes transaction dates with corresponding shopper, employee, and product names"
+    ]
+  },
+  {
+    "id": 4,
+    "name": "customer-total-spend",
+    "prompt": "How much has customer William Chen spent in total at Lumen & Stone?",
+    "expectations": [
+      "The agent does not use SQL, psql, asyncpg, or any direct database connection",
+      "The agent queries the HTTP API at localhost:8000/api/v1",
+      "The agent uses an analytics endpoint or resolves the shopper by listing and matching name",
+      "The output includes William Chen's total spend amount"
+    ]
+  }
+]
