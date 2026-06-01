@@ -1,4 +1,0 @@
-{"role":"user","message":{"content":[{"type":"text","text":"<user_query>\nIncrease test coverage to 90%\n</user_query>"}]}}
-{"role":"assistant","message":{"content":[{"type":"text","text":"I'll read the test files first.\n\n[REDACTED]"},{"type":"tool_use","name":"Read","input":{"path":"src/auth.test.ts"}},{"type":"tool_use","name":"CallMcpTool","input":{"server":"user-github","toolName":"search_issues","arguments":{"query":"coverage"}}}]}}
-{"role":"assistant","message":{"content":[{"type":"thinking","text":"The auth module lacks boundary tests for token expiry."},{"type":"tool_use","name":"Shell","input":{"command":"npm test -- --coverage","description":"Run coverage"}}]}}
-{"role":"tool","message":{"content":[{"type":"tool_result","name":"Shell","content":"All files | 72.4%"}]}}

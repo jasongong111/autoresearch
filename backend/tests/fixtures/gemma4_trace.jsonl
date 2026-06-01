@@ -1,3 +1,0 @@
-{"ts":"2026-05-21T14:00:01Z","phase":"prompt","message":"Gemma4 received task with optimized skill","level":"info"}
-{"ts":"2026-05-21T14:00:10Z","phase":"skill_call","message":"Gemma4 invoked math_exec","detail":"expression=2+2","level":"info"}
-{"ts":"2026-05-21T14:00:15Z","phase":"model_response","message":"Gemma4 returned final answer","detail":"answer=4","level":"success"}

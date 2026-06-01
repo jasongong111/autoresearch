@@ -1,4 +1,0 @@
-iteration	category	target	delta	guard	status	description
-0	-	-	-	pass	baseline	47 test failures
-1	type	auth.ts:42	-2	pass	fixed	add return type annotation
-2	test	api.test.ts	0	-	discard	wrong approach
