@@ -7,22 +7,23 @@ description: >-
 version: 2.1.0
 ---
 
-# Claude Autoresearch — Autonomous Goal-directed Skill Optimization
+# Claude Autoresearch — Gemma 4 E2B Skill Optimization
 
-**Core idea:** You are an autonomous skill optimizer. Modify the skill package → Verify with the target model/task → Keep/Discard → Repeat.
+**Core idea:** You are an autonomous skill optimizer for the Gemma 4 E2B agent. Modify the skill package → Verify by running the skill via `agent_core` on the gemma-4-e2b model → Observe the agent run result → Keep/Discard → Repeat.
 
 ## Task Folder Workspace
 
 Autoresearch runs **inside a task folder** under `tasks/<task-name>/`, not at the autoresearch repo root. Each task folder is its own git repo and project root for the loop: Verify runs with `cwd` set to that directory, and the dashboard watches it as a child project when the workspace contains `tasks/`.
 
-**Example:** `tasks/gemma3-math-skill-optimization/`
+**Example:** `tasks/gemma4-math-skill-optimization/`
 
 Before starting the loop:
 
 1. `cd` into the task folder (or confirm the orchestrator `--project` path points there).
-2. **Initialize git if missing** — see [Git requirement](#git-requirement) below.
-3. Read the task's `README.md` for Goal, Scope, Verify, and any task-specific rules.
-4. Run Verify from the task root (e.g. `./tests/verify-metric.sh`).
+2. **Run `setup.sh` if it exists** — `./setup.sh` or `bash setup.sh`. This installs dependencies, configures the environment, and prepares the task for optimization. Do not skip this step.
+3. **Initialize git if missing** — see [Git requirement](#git-requirement) below.
+4. Read the task's `README.md` for Goal, Scope, Verify, and any task-specific rules.
+5. Run Verify from the task root (e.g. `./verify.sh`).
 
 ### Git requirement
 
@@ -44,7 +45,26 @@ git add .
 git commit -m "baseline: initial task state"
 ```
 
-Do not start the loop until `git rev-parse --git-dir` succeeds and there is a baseline commit. If the working tree has uncommitted user changes, commit or stash them first (see `references/autonomous-loop-protocol.md` Phase 0).
+If `setup.sh` exists, it may have already initialized git. If not, run the commands above. Do not start the loop until `git rev-parse --git-dir` succeeds and there is a baseline commit. If the working tree has uncommitted user changes, commit or stash them first (see `references/autonomous-loop-protocol.md` Phase 0).
+
+### Python environment
+
+If `setup.sh` was run, it already created the venv and installed dependencies. Skip to activation:
+
+```bash
+source .venv/bin/activate
+```
+
+If there is no `setup.sh`, create the environment manually:
+
+```bash
+cd tasks/<task-name>
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Always use `python3` (not `python`) when invoking scripts. Run benchmarks and verify commands inside the activated virtual environment so dependencies are available.
 
 ### Task folder structure
 
@@ -60,45 +80,78 @@ tasks/<task-name>/
 │       ├── references/       # Optional: deep docs, FAQs, examples
 │       ├── scripts/          # Optional: deterministic CLIs the agent can run
 │       └── assets/           # Optional: templates, configs, boilerplate
-├── expected/                 # READ-ONLY — dev/golden set visible during optimization
+├── expected/                 # READ-ONLY — dev eval set (eval.json: prompts + expectations)
+│   └── eval.json             # Test cases: prompt + expectations array (scored against gemma4 output)
 ├── holdout/                  # READ-ONLY — hidden eval set (do not read while optimizing)
-├── tests/                    # READ-ONLY — benchmark harness and verify script
-│   ├── run_benchmark.py      # Runs the subject model against a split
-│   ├── scorer.py             # Parses and scores model outputs
-│   └── verify-metric.sh      # Prints one number for autoresearch Verify
+│   └── eval.json             # Final eval — run once after optimization, never tune against
 ├── requirements.txt          # Optional: Python deps for the harness
 ├── autoresearch-results.tsv  # Generated — iteration log (gitignored)
-└── .autoresearch/            # Generated — runtime traces and session metadata (gitignored)
+└── logs/                     # Generated — runtime traces and session metadata (gitignored)
+    ├── agent-core/
+    │   └── agent_core_trace.jsonl   # Gemma 4 E2B agent run trace
     ├── session.json          # Goal, Scope, Metric, Verify for the dashboard
     ├── trace.jsonl           # Autoresearch observer/optimizer trace
-    └── gemma3-trace.jsonl    # Subject-model execution trace (task-specific name)
+    └── experiment.jsonl      # Experiment action log
 ```
+
+### Skill scripts (deterministic helpers)
+
+The autoresearch skill provides executable scripts in `.claude/skills/autoresearch/scripts/`:
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/init_task.py` | Initialize logs, TSV, and run baseline verify in one command |
+| `scripts/log_iteration.py` | Append a result to both TSV and NDJSON logs |
+| `scripts/safe_revert.sh` | Safe `git revert`; restores `skills/` from pre-experiment parent |
+| `scripts/run_eval.py` | Generic eval.json runner via agent_core (metric on stdout only) |
+| `scripts/scaffold_task_harness.py` | Create `verify.sh`, `selection-verify.sh`, `tests/run_agent_eval.py` |
+| `scripts/parse_metric.py` | Parse numeric metric from verify stdout (used by `init_task.py`) |
+
+Use these instead of ad-hoc bash to reduce errors and keep behavior consistent across tasks.
 
 ### Roles and edit boundaries
 
 | Area | Role | Optimizer may edit? |
 |------|------|---------------------|
 | `skills/**` | Agent skill package under test | **Yes** — this is the only in-scope Modify target |
-| `tests/**` | Evaluator, scorer, verify script | **No** — keeps the metric honest and reproducible |
-| `expected/**` | Dev benchmark set | **No** |
-| `holdout/**` | Hidden final benchmark | **No** — do not read during the loop |
+| `expected/**` | Dev eval set (eval.json with prompts + expectations) | **No** |
+| `holdout/**` | Hidden final eval (eval.json) | **No** — do not read during the loop |
 | `input.md` | Shared prompt prefix | **No** |
-| `.autoresearch/**` | Traces and session files | **No** — write-only metadata from runs |
+| `logs/**` | Runtime traces and session files | **No** — write-only metadata from runs |
 | `autoresearch-results.tsv` | Iteration history | Append only via the logging protocol |
 
-Use `.autoresearch/gemma3-trace.jsonl` (or the task's subject trace) to inspect model failures. Use `.autoresearch/trace.jsonl` for the observer loop. After optimization, run holdout evaluation separately — never tune against holdout during the loop.
+Use `logs/agent-core/agent_core_trace.jsonl` to inspect Gemma 4 E2B agent run failures — tool calls, reasoning, and final answers. Use `logs/trace.jsonl` for the observer loop. After optimization, run holdout evaluation separately — never tune against holdout during the loop.
 
-### Example autoresearch config (gemma3 math task)
+### Example autoresearch config (gemma4 skill task)
 
 ```
 /autoresearch
-Goal: Maximize Gemma 3 accuracy on the dev math benchmark
+Goal: Maximize Gemma 4 E2B pass rate on the dev eval set
 Scope: skills/**/*
-Metric: accuracy % (higher is better)
+Metric: pass rate % (higher is better)
 Direction: higher
-Verify: ./tests/verify-metric.sh
+Verify: ./verify.sh
 Iterations: 20
 ```
+
+The `Verify` command runs each prompt in `expected/eval.json` through `agent_core` with the skill under test on the gemma-4-e2b model. The scorer rates gemma4's output against the `expectations` array for each test case and prints a single metric number (e.g., fraction of expectations met, pass rate, or accuracy). See `references/agent-core-cli.md` for how `agent_core` discovers task-local skills and produces trace logs.
+
+### Task README — Source of Truth
+
+Before the loop starts, **read `tasks/<task-name>/README.md`**. It is the authoritative source for the task definition. Extract the following fields from it:
+
+| Field | What to extract |
+|-------|-----------------|
+| `Goal` | The optimization objective |
+| `Metric` | The exact number the Verify command produces |
+| `Direction` | Whether higher or lower is better |
+| `Scope` | Which paths are editable vs read-only |
+| `Verify` | The benchmark / scoring command |
+| `Baseline` | Current best score (if listed) |
+| `Target` | Desired score (if listed) |
+| `Instructions` | Task-specific rules, constraints, and edge-case guidance |
+
+If the README and the user's inline config disagree, the README wins unless the user explicitly overrides it. Use the README to resolve ambiguity about scope boundaries, model-specific behavior, or guard conditions.
 
 ## Reference Files
 
@@ -107,6 +160,7 @@ Iterations: 20
 | `references/autonomous-loop-protocol.md` | Full loop protocol — preconditions, phases, keep/discard, crashes, guards |
 | `references/results-logging.md` | TSV results log format, initialization, and iteration logging |
 | `references/core-principles.md` | 7 generalizable principles from autoresearch |
+| `references/agent-core-cli.md` | How to run, serve, and debug the Gemma 4 skill agent locally |
 
 ## Safety Posture (read once per session)
 
@@ -146,69 +200,18 @@ These guardrails are documented in `references/autonomous-loop-protocol.md`; do 
 - User says "help me set up autoresearch", "optimize this skill", "improve the skill package" → run the loop (collect config first if missing)
 - Any task requiring repeated iteration cycles with measurable outcomes on a skill package → run the loop
 
-## Bounded Iterations
+## Loop Controls
 
-By default, autoresearch loops until the metric plateaus (no improvement to the best metric for 15 consecutive measured iterations), then asks the user whether to stop, continue, or change strategy. To run exactly N iterations instead, add `Iterations: N` to your inline config.
+| Control | Default | Description |
+|---------|---------|-------------|
+| `Iterations` | unlimited | Loop exactly N times, then stop and print summary |
+| `Plateau-Patience` | 15 | In unlimited mode, pause after N iterations without a new best and ask user |
+| `Plateau-Patience: off` | — | Disable plateau detection (useful for overnight runs) |
+| `Guard` | none | Optional pass/fail or metric-valued regression check |
+| `Guard-Direction` | — | `higher is better` or `lower is better` (metric-valued guards only) |
+| `Guard-Threshold` | — | Max allowed regression % from baseline (e.g., `5%`) |
 
-**Unlimited (default):**
-```
-/autoresearch
-Goal: Increase benchmark score on math tasks
-```
-
-**Bounded (N iterations):**
-```
-/autoresearch
-Goal: Increase benchmark score on math tasks
-Iterations: 25
-```
-
-After N iterations Claude stops and prints a final summary with baseline → current best, keeps/discards/crashes. If the goal is achieved before N iterations, Claude prints early completion and stops.
-
-### When to Use Bounded Iterations
-
-| Scenario | Recommendation |
-|----------|---------------|
-| Run overnight, review in morning | Unlimited + `Plateau-Patience: off` |
-| Quick 30-min improvement session | `Iterations: 10` |
-| Targeted fix with known scope | `Iterations: 5` |
-| Exploratory — see if approach works | `Iterations: 15` |
-| CI/CD pipeline integration | `--iterations N` flag (set N based on time budget) |
-| Long run with safety net (default) | Unlimited (plateau detection after 15 iterations) |
-
-### Plateau Detection
-
-In unlimited mode, autoresearch tracks whether the best metric is still improving. If 15 consecutive measured iterations pass without a new best, the loop pauses and asks the user to decide: stop, continue, or change strategy. Configure with `Plateau-Patience: N` (default 15), or disable with `Plateau-Patience: off`. Bounded mode ignores this setting.
-
-```
-/autoresearch
-Goal: Reduce benchmark error rate
-Verify: ./tests/verify-metric.sh
-Plateau-Patience: 20
-```
-
-### Metric-Valued Guards
-
-By default, guards are pass/fail (exit code 0 = pass). For guards that measure a number (bundle size, response time, coverage), you can set a regression threshold instead:
-
-```
-/autoresearch
-Goal: Increase benchmark score to 0.90
-Verify: ./tests/verify-metric.sh
-Guard: ./scripts/check-evaluator-integrity.sh
-Guard-Direction: lower is better
-Guard-Threshold: 5%
-```
-
-This means: "optimize the score, but reject any change that regresses the guard metric more than 5% from baseline." The primary metric still drives keep/discard. The guard-metric is tracked in the results log for visibility into drift over time.
-
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `Guard` | Yes | Command that outputs a number (metric-valued) or exits 0/1 (pass/fail) |
-| `Guard-Direction` | Only for metric-valued | `higher is better` or `lower is better` |
-| `Guard-Threshold` | Only for metric-valued | Max allowed regression as % of baseline (e.g., `5%`, `0%` for strict) |
-
-Without `Guard-Direction` and `Guard-Threshold`, the guard operates in pass/fail mode.
+See `references/autonomous-loop-protocol.md` for full details on plateau detection, guard logic, and bounded mode behavior.
 
 ## Setup Phase (Do Once)
 
@@ -245,14 +248,14 @@ Use a SINGLE `AskUserQuestion` call with these 4 questions:
 
 ### Setup Steps (after config is complete)
 
-1. **Confirm working directory** — task folder root (e.g. `tasks/gemma3-math-skill-optimization/`)
-2. **Initialize git if missing** — run `git init`, `git add .`, and a baseline commit when `git rev-parse --git-dir` fails
-3. **Read all in-scope files** for full context before any modification
-4. **Define the goal** — extracted from user input, inline config, or the task `README.md`
-5. **Define scope constraints** — validated file globs under `skills/` (never `tests/`, `expected/`, or `holdout/`)
-6. **Define guard (optional)** — regression prevention command
-7. **Create a results log** — Track every iteration (see `references/results-logging.md`)
-8. **Establish baseline** — Run verification on current state AND guard (if set). Record as iteration #0
+1. **Confirm working directory** — task folder root (e.g. `tasks/gemma4-math-skill-optimization/`)
+2. **Run `setup.sh` if present** — `./setup.sh` or `bash setup.sh`. Installs deps, configures environment. Do not skip.
+3. **Initialize git if missing** — run `git init`, `git add .`, and a baseline commit when `git rev-parse --git-dir` fails
+4. **Read all in-scope files** for full context before any modification
+5. **Define the goal** — extracted from user input, inline config, or the task `README.md`
+6. **Define scope constraints** — validated file globs under `skills/` (never `expected/`, `holdout/`, or `logs/`)
+7. **Define guard (optional)** — regression prevention command
+8. **Create a results log** — Run `.claude/skills/autoresearch/scripts/init_task.py --verify ./verify.sh --direction higher_is_better` to create `logs/`, `autoresearch-results.tsv`, and record the baseline metric as iteration #0
 9. **Confirm and go** — Show user the setup, get confirmation, then BEGIN THE LOOP
 
 ## The Loop
@@ -272,18 +275,22 @@ LOOP (FOREVER or N times):
   2. Ideate: Pick next change based on goal, past results, what hasn't been tried
   3. Modify: Make ONE focused change using the three-level skill optimization policy
   4. Commit: Git commit the change (before verification)
-  5. Verify: Run the mechanical metric (tests, build, benchmark, etc.)
-  6. Guard: If guard is set, run the guard command
-  7. Decide:
-     - IMPROVED + guard passed (or no guard) → Keep commit, log "keep", advance
-     - IMPROVED + guard FAILED → Revert, then try to rework the optimization
-       (max 2 attempts) so it improves the metric WITHOUT breaking the guard.
-       Never modify guard/test files — adapt the implementation instead.
-       If still failing → log "discard (guard failed)" and move on
-     - SAME/WORSE → Git revert, log "discard"
-     - CRASHED → Try to fix (max 3 attempts), else log "crash" and move on
-  8. Log: Record result in results log and `.autoresearch/experiment.jsonl`
-  9. Repeat: Go to step 1.
+  5. Verify: Run the Verify command, which loads `expected/eval.json` and runs each prompt through `agent_core` with the skill under test on the gemma-4-e2b model. The scorer rates gemma4's output against the expectations array and prints a single metric number.
+  6. Guard: If guard is set, run the guard command.
+  7. Selection-Verify: If training metric improved, run the selection verify command (holdout/eval.json through agent_core on gemma-4-e2b). If selection does not improve, discard.
+  8. Decide (strict order enforced):
+     1. Training SAME/WORSE or CRASHED → Revert, log "discard" / "crash"
+     2. Training IMPROVED + Selection FAILED
+        → Revert, log "discard (selection)"
+     3. Training IMPROVED + Selection IMPROVED + Guard FAILED
+        → Revert, then try to rework the optimization (max 2 attempts)
+          so it improves the metric WITHOUT breaking the guard.
+          Never modify guard/test files — adapt the implementation instead.
+          If still failing → log "discard (guard failed)" and move on
+     4. Training IMPROVED + Selection IMPROVED + Guard passed (or not configured)
+        → Keep commit, log "keep", advance
+  9. Log: Use `python .claude/skills/autoresearch/scripts/log_iteration.py` to append the result to both `autoresearch-results.tsv` and `logs/experiment.jsonl`
+  10. Repeat: Go to step 1.
      - If unbounded: NEVER STOP. NEVER ASK "should I continue?"
      - If bounded (N): Stop after N iterations, print final summary
 ```
@@ -314,17 +321,4 @@ Within a task folder, only paths under `skills/` are editable:
 | `skills/<name>/scripts/**` | Deterministic code or CLIs the agent can run | Add a fraction simplifier or answer normalizer |
 | `skills/<name>/assets/**` | Reusable templates, boilerplate files, configurations | Add answer templates or tool config files |
 
-The metric is always task-specific and mechanical, such as a target-model benchmark score from `./tests/verify-metric.sh`. The guard should protect evaluator integrity, benchmark reproducibility, and any files outside `skills/`.
-
-## Post-Completion: Support Prompt (Once Per Project)
-
-After the FIRST successful completion of an autoresearch run in a project (loop finishes, summary printed, or bounded iterations complete), check if the file `.autoresearch-starred` exists in the project root.
-
-**If it does NOT exist:**
-
-Ask the user: *"If autoresearch helped, would you like to star the repo on GitHub to support the project? I can run `gh api -X PUT /user/starred/uditgoenka/autoresearch` for you."*
-
-- If yes → run the command, then create `.autoresearch-starred` marker file
-- If no → create `.autoresearch-starred` marker file (never ask again)
-
-**If it exists:** skip entirely. Never ask twice.
+The metric is always task-specific and mechanical, extracted from an `agent_core` run on the gemma-4-e2b model. The Verify command (typically `./verify.sh`) invokes `agent_core` with the skill under test, scores the agent run result, and prints a single number. The guard should protect evaluator integrity, benchmark reproducibility, and any files outside `skills/`.
