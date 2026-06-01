@@ -7,36 +7,58 @@
 # Open http://127.0.0.1:3847 (backend) or http://127.0.0.1:3000 (frontend nginx)
 
 services:
-  backend:
+  agent-core:
     build:
       context: .
-      dockerfile: backend/Dockerfile
-    image: autoresearch-backend:latest
+      dockerfile: agent_core/Dockerfile
+    image: agent-core:latest
     ports:
-      - "${DASHBOARD_PORT:-3847}:3847"
+      - "${AGENT_CORE_PORT:-8766}:8766"
     env_file:
       - .env
     environment:
-      DASHBOARD_HOST: 0.0.0.0
-      DASHBOARD_PORT: "3847"
-      DASHBOARD_PROJECT: /workspace
-      DASHBOARD_TRANSCRIPTS_DIR: /transcripts
-      CURSOR_API_KEY: ${CURSOR_API_KEY:-}
-      CURSOR_MODEL: ${CURSOR_MODEL:-composer-2.5}
+      GEMMA4_API_KEY: ${GEMMA4_API_KEY:-}
+      GEMMA4_MODEL_ID: ${GEMMA4_MODEL_ID:-google/gemma-4-E2B-it}
+      GEMMA4_BASE_URL: ${GEMMA4_BASE_URL:-https://api-lm.tr-dev.work/v1}
+      LUMENSTONE_API_URL: http://mock-backend:8000/api/v1
     volumes:
-      - ${DASHBOARD_WORKSPACE:-.}:/workspace:rw
-      - ${CURSOR_TRANSCRIPTS_DIR:-${HOME}/.cursor/projects/Users-jasongong-Desktop-autoresearch/agent-transcripts}:/transcripts:ro
+      - .:/app:rw
+    depends_on:
+      - mock-backend
     restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    image: autoresearch-frontend:latest
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
+  mock-postgres:
+    image: postgres:16-alpine
+    container_name: lumenstone-postgres
     environment:
-      - BACKEND_URL=http://backend:3847
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lumenstone
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lumenstone"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mock-backend:
+    build:
+      context: ./mock-backend
+      dockerfile: Dockerfile
+    container_name: lumenstone-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@mock-postgres:5432/lumenstone
     depends_on:
-      - backend
-    restart: unless-stopped
+      mock-postgres:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:

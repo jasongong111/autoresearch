@@ -3,8 +3,8 @@
 #
 # Usage:
 #   export CURSOR_API_KEY="cursor_..."
-#   ./bin/autoresearch-cursor --project tasks/gemma3-math-skill-optimization \
-#     --goal "Improve Gemma 3 math score" \
+#   ./bin/autoresearch-cursor --project tasks/gemma4-math-skill-optimization \
+#     --goal "Improve Gemma 4 math score" \
 #     --scope "skills/**" \
 #     --metric "accuracy" \
 #     --verify "./tests/verify-metric.sh" \

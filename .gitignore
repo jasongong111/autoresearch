@@ -35,3 +35,13 @@ dashboard/web/dist/
 samples/
 *.pyc
 settings.local.json
+
+# Agent core runtime logs
+logs/
+
+# Task generated artifacts
+tasks/*/.autoresearch/
+tasks/*/autoresearch-results.tsv
+tasks/*/__pycache__/
+tasks/*/.venv/
+tasks/*/tests/*_results.json

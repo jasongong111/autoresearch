@@ -14,27 +14,82 @@ Autonomous goal-directed iteration based on [Karpathy's autoresearch](https://gi
 
 This project investigates whether optimized agentic skills can help a small language model approach the performance of state-of-the-art models on complex agentic tasks.
 
-Use Gemma 3 as the small-model testbed. The central research question is:
+Use Gemma 4 as the testbed. The central research question is:
 
-> Can optimized agentic skills help small models approach the performance of state-of-the-art models?
+> Can optimized agentic skills help models approach the performance of state-of-the-art models?
 
 The experimental comparison should preserve three distinct conditions:
 
-1. **Gemma 3 without skill support** — baseline small-model performance.
-2. **Gemma 3 with a frontier-generated skill** — measures initial skill transfer.
-3. **Gemma 3 with an optimized skill** — measures the additional gain from iterative skill refinement.
+1. **Gemma 4 without skill support** — baseline performance.
+2. **Gemma 4 with a frontier-generated skill** — measures initial skill transfer.
+3. **Gemma 4 with an optimized skill** — measures the additional gain from iterative skill refinement.
 
 The autoresearch agent is an external observer and optimizer, not the model under evaluation. It may inspect results, traces, metrics, and failures, then modify the skill. It should not change the benchmark, evaluator, scoring pipeline, or Gemma 4 model configuration unless the user explicitly asks.
 
 For this research track, interpret the loop as:
 
 ```text
-Modify skill -> Run Gemma 3 -> Score result -> Keep/Discard -> Repeat
+Modify skill -> Run Gemma 4 -> Score result -> Keep/Discard -> Repeat
 ```
 
-Keep the editable target restricted to the skill. Keep verification mechanical, numeric, and reproducible. Treat `.autoresearch/gemma4-trace.jsonl` as the Gemma 4 execution trace and `.autoresearch/trace.jsonl` as the autoresearch observer/optimizer trace.
+Keep the editable target restricted to the skill. Keep verification mechanical, numeric, and reproducible. Treat `.autoresearch/gemma4-trace.jsonl` as the subject-model (Gemma 4) execution trace, and `.autoresearch/trace.jsonl` as the autoresearch observer/optimizer trace.
 
 Within the Modify step, "the skill" means the complete agent skill package: `SKILL.md`, deterministic scripts or CLIs the agent can run, reference documentation such as domain rules and FAQs, and reusable assets such as code templates, boilerplate files, and configurations.
+
+---
+
+## Task Folder Workspace
+
+Research and skill-optimization loops run **inside a task folder** under `tasks/<task-name>/`, not at the autoresearch repo root. Each task folder is its own git repo and project root: Verify runs with `cwd` set to that directory, and the dashboard watches it as a child project when the workspace contains `tasks/`.
+
+**Example:** [`tasks/gemma4-math-skill-optimization/`](tasks/gemma4-math-skill-optimization/)
+
+Before starting the loop:
+
+1. `cd` into the task folder (or point the orchestrator `--project` path there).
+2. **Initialize git if missing** — autoresearch requires git for `experiment:` commits and rollbacks.
+3. Read the task `README.md` for Goal, Scope, Verify, and task-specific rules.
+4. Run Verify from the task root (e.g. `./tests/verify-metric.sh`).
+
+```bash
+cd tasks/<task-name>
+git rev-parse --git-dir || { git init && git add . && git commit -m "baseline: initial task state"; }
+```
+
+### Task folder layout
+
+```
+tasks/<task-name>/
+├── README.md                 # Goal, verify command, editable scope, run instructions
+├── input.md                  # Optional: instructions merged with each benchmark prompt
+├── skills/                   # EDITABLE — optimizer target (skill package)
+│   └── <skill-name>/
+│       ├── SKILL.md
+│       ├── references/       # Optional: deep docs, FAQs, examples
+│       ├── scripts/          # Optional: deterministic CLIs
+│       └── assets/           # Optional: templates, configs, boilerplate
+├── expected/                 # READ-ONLY — dev/golden set visible during optimization
+├── holdout/                  # READ-ONLY — hidden eval set (do not read while optimizing)
+├── tests/                    # READ-ONLY — benchmark harness and verify script
+├── autoresearch-results.tsv  # Generated — iteration log
+└── .autoresearch/            # Generated — runtime traces and session metadata
+    ├── session.json          # Goal, Scope, Metric, Verify for the dashboard
+    ├── trace.jsonl           # Autoresearch observer/optimizer trace
+    └── gemma4-trace.jsonl    # Subject-model execution trace (name varies by task)
+```
+
+### Edit boundaries
+
+| Area | Role | Optimizer may edit? |
+|------|------|---------------------|
+| `skills/**` | Agent skill package under test | **Yes** — only in-scope Modify target |
+| `tests/**` | Evaluator, scorer, verify script | **No** |
+| `expected/**` | Dev benchmark set | **No** |
+| `holdout/**` | Hidden final benchmark | **No** — do not read during the loop |
+| `input.md` | Shared prompt prefix | **No** |
+| `.autoresearch/**` | Traces and session files | **No** — write-only metadata from runs |
+
+After optimization, run holdout evaluation separately — never tune against holdout during the loop.
 
 ---
 
@@ -73,6 +128,9 @@ cp autoresearch/claude-plugin/commands/autoresearch.md .claude/commands/autorese
 
 # Codex
 cp -r autoresearch/plugins/autoresearch ~/.agents/plugins/autoresearch
+
+# Cursor (this repo)
+# Skills already live at .agents/skills/autoresearch/ when cloned
 ```
 
 ---
@@ -108,11 +166,43 @@ cd frontend && npm install && npm run build && cd ..
 
 Open http://127.0.0.1:3847. See [backend/README.md](backend/README.md) for dev mode, API, and supported log formats.
 
+When the dashboard watches a workspace root that contains `tasks/`, each immediate `tasks/*` directory appears as a child project with its own runs, git history, and traces.
+
+### Orchestrator and Cursor SDK runner
+
+The dashboard can spawn autoresearch runs from the web UI. For programmatic runs with the Cursor SDK:
+
+```bash
+export CURSOR_API_KEY="cursor_..."
+./bin/autoresearch-cursor \
+  --project tasks/gemma4-math-skill-optimization \
+  --goal "Improve Gemma 4 math benchmark score" \
+  --scope "skills/**" \
+  --metric "accuracy (higher is better)" \
+  --verify "./tests/verify-metric.sh" \
+  --iterations 5
+```
+
+Set `CURSOR_API_KEY` in `.env` (see `.env.example`). Docker Compose runs the full stack with `docker compose up --build`.
+
 ---
 
-## Sample project (test loop)
+## Sample project (research task)
 
-A minimal agentic-skill router lives at [`samples/agentic-skill-demo/`](samples/agentic-skill-demo/). Run `./scripts/setup.sh` there, then `/autoresearch` with `Verify: ./scripts/verify-metric.sh` (see sample README).
+The Gemma 4 math skill optimization task lives at [`tasks/gemma4-math-skill-optimization/`](tasks/gemma4-math-skill-optimization/). Initialize git there, set `GEMMA4_API_KEY`, then run `/autoresearch` with `Verify: ./tests/verify-metric.sh` (see task README).
+
+### Research-track quick start
+
+```
+cd tasks/gemma4-math-skill-optimization
+/autoresearch
+Goal: Maximize Gemma 4 accuracy on the dev math benchmark
+Scope: skills/**/*
+Metric: accuracy % (higher is better)
+Direction: higher
+Verify: ./tests/verify-metric.sh
+Iterations: 20
+```
 
 ---
 
@@ -348,13 +438,15 @@ iteration  commit   metric  delta   status    description
 - Wrapper CLI: `bin/autoresearch <subcommand> [flags]`
 - Canonical command spec: `plugins/autoresearch/resources/autoresearch-command-spec.json`
 
-### Other Agents (OpenCode, Gemini CLI, etc.)
+### Cursor and other agents (OpenCode, Gemini CLI, etc.)
 
+- Skill files for this repo: `.agents/skills/autoresearch/SKILL.md` + `references/*.md`
+- Model API skills: `.agents/skills/gemma3-api/SKILL.md`, `.agents/skills/gemma4-api/SKILL.md`
 - Read this file for the command surface and configuration contract
 - Use the core loop protocol: review → change → commit → verify → keep/revert → log
-- Git is required — the loop uses `git commit`, `git revert`, `git log`, `git diff`
+- Git is required in the **task folder** — the loop uses `git commit`, `git revert`, `git log`, `git diff`
 - Each iteration must be atomic (one change, one commit, one verification)
-- For detailed workflow references, see: `claude-plugin/skills/autoresearch/references/*.md`
+- For detailed workflow references, see: `claude-plugin/skills/autoresearch/references/*.md` or `.agents/skills/autoresearch/references/*.md`
 
 ---
 
@@ -363,9 +455,15 @@ iteration  commit   metric  delta   status    description
 ```
 autoresearch/
 ├── AGENTS.md                          ← You are here
+├── CLAUDE.md                          ← Claude Code repo guidance
 ├── README.md                          ← Full documentation
 ├── COMPARISON.md                      ← Karpathy's vs Claude Autoresearch
 ├── guide/                             ← Comprehensive guides per command
+├── tasks/                             ← Research task folders (each is its own git repo)
+│   └── gemma4-math-skill-optimization/
+├── .agents/skills/                    ← Cursor agent skills (autoresearch, gemma4-api)
+├── backend/                           ← Dashboard FastAPI server
+├── frontend/                          ← Dashboard React UI
 ├── claude-plugin/                     ← Claude Code distribution package
 │   ├── skills/autoresearch/SKILL.md   ← Main skill + references/
 │   └── commands/autoresearch/         ← Subcommand registrations
@@ -373,7 +471,10 @@ autoresearch/
 │   ├── skills/autoresearch/SKILL.md   ← Codex skill router + references/
 │   ├── resources/                     ← Command spec JSON
 │   └── scripts/                       ← Wrapper CLI
-└── bin/autoresearch                   ← Convenience wrapper
+└── bin/
+    ├── autoresearch                   ← Codex CLI wrapper
+    ├── autoresearch-dashboard         ← Dashboard server
+    └── autoresearch-cursor            ← Cursor SDK runner
 ```
 
 ---
