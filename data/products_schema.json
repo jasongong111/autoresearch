@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Product",
+  "description": "A single item in the Lumen & Stone Fine Jewelry product catalog. The system has access to many records of this shape.",
+  "type": "object",
+  "properties": {
+    "product_id": { "type": "string", "pattern": "^P-\\d{5}$" },
+    "name": { "type": "string" },
+    "category": {
+      "type": "string",
+      "enum": ["ring", "necklace", "earrings", "bracelet", "pendant", "brooch", "chain", "cufflinks"]
+    },
+    "collection": { "type": "string", "description": "Catalog collection the piece belongs to." },
+    "metal": { "type": "string", "description": "Primary metal (e.g. platinum, 18k yellow gold, sterling silver)." },
+    "gemstones": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Gemstones set in the piece; empty array for plain-metal items."
+    },
+    "price_usd": { "type": "number", "minimum": 0, "description": "List price in USD." },
+    "weight_grams": { "type": "number", "minimum": 0 },
+    "in_stock": { "type": "integer", "minimum": 0, "description": "Units currently on hand." },
+    "ethically_sourced": { "type": "boolean", "description": "True if the piece carries documented ethical-sourcing provenance." },
+    "description": { "type": "string" }
+  },
+  "required": [
+    "product_id", "name", "category", "metal", "gemstones",
+    "price_usd", "in_stock"
+  ]
+}

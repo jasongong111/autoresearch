@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Transaction",
+  "description": "A single sale at Lumen & Stone Fine Jewelry recording which employee served which customer to buy which product. customer_id is a foreign key into shoppers.json (Shopper), employee_id into employees.json (Employee), and product_id into products.json (Product).",
+  "type": "object",
+  "properties": {
+    "transaction_id": { "type": "string", "pattern": "^T-\\d{6}$" },
+    "date": { "type": "string", "format": "date" },
+    "customer_id": { "type": "string", "pattern": "^C-\\d{5}$", "description": "The shopper who bought the item (foreign key to shoppers.json)." },
+    "employee_id": { "type": "string", "pattern": "^E-\\d{4}$", "description": "The staff member who served the customer (foreign key to employees.json)." },
+    "product_id": { "type": "string", "pattern": "^P-\\d{5}$", "description": "The catalog item sold (foreign key to products.json)." },
+    "quantity": { "type": "integer", "minimum": 1 },
+    "unit_price_usd": { "type": "number", "minimum": 0, "description": "Price per unit at the time of sale." },
+    "discount_pct": { "type": "number", "minimum": 0, "maximum": 100, "description": "Percentage discount applied to the line." },
+    "total_usd": { "type": "number", "minimum": 0, "description": "Amount charged: quantity * unit_price_usd, less discount_pct." },
+    "payment_method": {
+      "type": "string",
+      "enum": ["credit card", "cash", "bank transfer", "financing", "store credit"]
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["in-store", "phone", "online", "private appointment"]
+    },
+    "notes": { "type": "string", "description": "Internal notes about the sale." }
+  },
+  "required": [
+    "transaction_id", "date", "customer_id", "employee_id", "product_id",
+    "quantity", "unit_price_usd", "total_usd", "payment_method", "channel"
+  ]
+}
